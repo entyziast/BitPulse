@@ -11,7 +11,7 @@ import os
 from dotenv import load_dotenv
 from schemas.users import ShowUser, CreateUser, TokenResponse
 import crud.users as crud_users
-
+from dependencies.users import get_current_user
 
 load_dotenv()
 
@@ -74,7 +74,6 @@ async def login(
 
 @router.post('/refresh', response_model=TokenResponse)
 async def refresh_token(
-    db: SessionDep,
     redis: RedisDep,
     refresh_token: str
 ) -> TokenResponse:
@@ -100,3 +99,12 @@ async def refresh_token(
         token_type="bearer"
     )
     return response
+
+
+@router.get('/logout')
+async def logout(
+    redis: RedisDep,
+    current_user: Annotated[ShowUser, Depends(get_current_user)]
+):
+    result = await crud_users.delete_refresh_token(redis, current_user.username)
+    return {"detail": "Logged out from server"}

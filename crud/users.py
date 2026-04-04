@@ -58,3 +58,7 @@ async def update_refresh_token(redis: Redis, username: str, refresh_token: str):
 async def verify_refresh_token(redis: Redis, username: str, refresh_token: str):
     token_from_redis = await redis.get(f'refresh:{username}')
     return token_from_redis == refresh_token
+
+async def delete_refresh_token(redis: Redis, username: str):
+    key = f'refresh:{username}'
+    await redis.delete(key)
