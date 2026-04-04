@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 import datetime
 
 class BaseUser(BaseModel):
-    username: str = Field(..., max_length=16)
+    username: str = Field(...,min_length=4, max_length=16)
     email: EmailStr
 
     model_config = {"from_attributes": True}
@@ -18,4 +18,5 @@ class ShowUser(BaseUser):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str

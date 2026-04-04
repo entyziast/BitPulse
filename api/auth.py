@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import get_session
 from datetime import datetime, timedelta, timezone
+from database.redis import get_redis
+from redis.asyncio import Redis
 from typing import Annotated
 import jwt
 import os
@@ -17,6 +19,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = os.getenv('ALGORITHM')
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
 
 router = APIRouter(
     prefix='/auth',
@@ -42,14 +45,58 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def create_refresh_token(data: dict):
+    expire = datetime.now(timezone.utc) + timedelta(days=7)
+    to_encode = data.copy()
+    to_encode.update({"exp": expire, "type": "refresh"}) 
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post('/login', response_model=TokenResponse)
 async def login(
     db: SessionDep,
+    redis: RedisDep,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenResponse:
     if not await crud_users.verify_users(db, form.username, form.password):
         raise HTTPException(status_code=400, detail='Wrong username or password!')
 
-    token = create_access_token(data={"sub": form.username})
-    return TokenResponse(access_token=token, token_type="bearer")
+    access_payload = {"sub": form.username}
+    access_token = create_access_token(data=access_payload)
+    refresh_token = create_refresh_token(data=access_payload)
+
+    await crud_users.update_refresh_token(redis, form.username, refresh_token)
+    response = TokenResponse(
+        access_token=access_token, 
+        refresh_token=refresh_token, 
+        token_type="bearer"
+    )
+    return response
+
+@router.post('/refresh', response_model=TokenResponse)
+async def refresh_token(
+    db: SessionDep,
+    redis: RedisDep,
+    refresh_token: str
+) -> TokenResponse:
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail='This is not refresh token')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    
+    if not (await crud_users.verify_refresh_token(redis, username, refresh_token)):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    new_access = create_access_token({"sub": username})
+    new_refresh = create_refresh_token({"sub": username})
+    
+    await crud_users.update_refresh_token(redis, username, new_refresh)
+    response = TokenResponse(
+        access_token=new_access, 
+        refresh_token=new_refresh, 
+        token_type="bearer"
+    )
+    return response

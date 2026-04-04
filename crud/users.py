@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel
 from schemas.users import CreateUser
 from passlib.context import CryptContext
+from redis.asyncio import Redis
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -47,4 +49,12 @@ async def verify_users(db: AsyncSession, username: str, password: str):
 
     return pwd_context.verify(password, user.hashed_password)
 
-    
+
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+async def update_refresh_token(redis: Redis, username: str, refresh_token: str):
+    key = f'refresh:{username}'
+    await redis.set(key,refresh_token, ex=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60)
+
+async def verify_refresh_token(redis: Redis, username: str, refresh_token: str):
+    token_from_redis = await redis.get(f'refresh:{username}')
+    return token_from_redis == refresh_token
