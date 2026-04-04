@@ -1,0 +1,44 @@
+version: '3.8'
+
+volumes:
+  postgres_data:
+  #elastic_data:
+
+services:
+  # Основное приложение FastAPI
+  app:
+    build: .
+    container_name: bitpulse_app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+      #- elasticsearch
+    
+
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: bitpulse_db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis (Broker для Celery и Кеш)
+  redis:
+    image: redis:7-alpine
+    container_name: bitpulse_redis
+    ports:
+      - "6379:6379"
+
