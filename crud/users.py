@@ -26,8 +26,13 @@ async def get_user(
     else:
         return None
 
+    
     result = await db.execute(stmt)
-    return result.scalars().first()
+    user = result.scalars().one_or_none()
+    if user is None:
+        return None
+    await db.refresh(user, ["tickers"])
+    return user
 
 
 async def create_user(db: AsyncSession, user: CreateUser):

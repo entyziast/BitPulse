@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 import crud.users as crud_users
 from schemas.users import ShowUser
+from schemas.relations import UserWithTickers
 from dependencies.users import get_current_user
 
 
@@ -19,13 +20,13 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 async def get_all_users(db: SessionDep) -> list[ShowUser]:
     return await crud_users.get_users(db)
 
-@router.get('/me', response_model=ShowUser)
+@router.get('/me', response_model=UserWithTickers)
 async def get_user_me(
     db: SessionDep,
     current_user: Annotated[UserModel, Depends(get_current_user)]
 ):
     return current_user
-    
+
 @router.get('/{username}', response_model=ShowUser)
 async def get_user(
     db: SessionDep,

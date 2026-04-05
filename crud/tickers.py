@@ -37,6 +37,14 @@ async def get_all_tickers_info(
     return result.scalars().all()
 
 
+async def get_my_tickers(
+    db: AsyncSession,
+    user: UserModel
+):
+    await db.refresh(user, ["tickers"])
+    return user.tickers
+
+
 async def create_ticker(
     db: AsyncSession,
     ticker_symbol: str,

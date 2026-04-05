@@ -71,6 +71,27 @@ async def subscribe_to_ticker(
     return user
 
 
+@router.delete('/subscribe/{symbol}', response_model=UserWithTickers)
+async def unsubscribe_to_ticker(
+    db: SessionDep,
+    user: UserMeDep,
+    symbol: str
+):
+    user = await crud_tickers.unsubscribe_ticker(db,symbol,user)
+    if user is None:
+        raise HTTPException(status_code=404, detail='Not found this ticker in db')
+    return user
+
+
+@router.get('/my_tickers', response_model=list[Ticker])
+async def get_my_tickers(
+    db: SessionDep,
+    user: UserMeDep,
+):
+    result = await crud_tickers.get_my_tickers(db, user)
+    return result
+
+
 @router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
 async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
     url = "https://api.binance.com/api/v3/ticker/price"
