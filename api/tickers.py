@@ -1,7 +1,11 @@
-from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends
+from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends, Path, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 from dependencies.users import get_current_user
 from database.database import get_session
+from database.models import UserModel
 from database.redis import get_redis
+from schemas.tickers import Ticker
+from schemas.relations import UserWithTickers
 import crud.tickers as crud_tickers
 from redis import Redis
 from database.redis import get_redis
@@ -11,10 +15,16 @@ import websockets
 import httpx
 import json
 
+
 router = APIRouter(
     prefix='/tickers',
     tags=['tickers', ],
 )
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+UserMeDep = Annotated[UserModel, Depends(get_current_user)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
+
 
 tickers = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
@@ -30,13 +40,39 @@ tickers = [
 ]
 
 
-@router.get('/')
-def test():
-    return {'q': 123}
+@router.post('/subscribe/{symbol}', response_model=UserWithTickers, status_code=201)
+async def subscribe_to_ticker(
+    db: SessionDep,
+    user: UserMeDep,
+    symbol: Annotated[str, Path(title='Name ticker')]
+):
+
+    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
+
+    if ticker is None:
+        # Ticker not found in db
+        url = 'https://api.binance.com/api/v3/exchangeInfo'
+        params = {
+            'symbol' : symbol.upper()
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url=url,params=params)
+            if response.status_code == 200:
+                data = response.json()
+                ticker_data = data['symbols'][0]
+                symbol = ticker_data['symbol']
+                name = ticker_data['baseAsset']
+                await crud_tickers.create_ticker(db, ticker_symbol=symbol, ticker_name=name)
+            else:
+                raise HTTPException(status_code=response.status_code, detail='Error to find this ticker in Binance API')
+
+    user = await crud_tickers.subscribe_ticker(db,symbol,user)
+    return user
 
 
-@router.get('/connect_to_binanceapi')
-async def connect_to_binanceapi(redis: Annotated[Redis, Depends(get_redis)]):
+@router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
+async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
     url = "https://api.binance.com/api/v3/ticker/price"
     
 
@@ -47,7 +83,7 @@ async def connect_to_binanceapi(redis: Annotated[Redis, Depends(get_redis)]):
     async with httpx.AsyncClient() as client:
         response = await client.get(url,params=params)
         data = response.json()
-        await crud_tickers.save_prices(redis, data)
+        await crud_tickers.save_prices_in_redis(redis, data)
     
     return {'response' : data}
 
