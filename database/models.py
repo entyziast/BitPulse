@@ -6,14 +6,14 @@ class Base(DeclarativeBase):
     pass
 
 
-UserTiсkerTable = Table(
+UserTickerTable = Table(
     "user_ticker_subscriptions",
     Base.metadata,
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("ticker_id", Integer, ForeignKey("tickers.id", ondelete="CASCADE"), primary_key=True),
 )
 
-class TiсkerModel(Base):
+class TickerModel(Base):
     __tablename__ = 'tickers'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -21,8 +21,8 @@ class TiсkerModel(Base):
     name: Mapped[str] = mapped_column(String, nullable=True)
     subscribers: Mapped[list['UserModel']] = relationship(
         'UserModel',
-        secondary=UserTiсkerTable,
-        back_populates='tikers'
+        secondary=UserTickerTable,
+        back_populates='tickers'
     )
 
 
@@ -33,10 +33,10 @@ class UserModel(Base):
     username: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255))
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    tiсkers: Mapped[list['TiсkerModel']] = relationship(
-        'TiсkerModel',
-        secondary=UserTiсkerTable,
-        back_populates='users'
+    tickers: Mapped[list['TickerModel']] = relationship(
+        'TickerModel',
+        secondary=UserTickerTable,
+        back_populates='subscribers'
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, 
