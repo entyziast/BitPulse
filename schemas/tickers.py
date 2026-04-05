@@ -13,3 +13,6 @@ class TickerCreate(TickerBase):
 
 class Ticker(TickerBase):
     id: int
+
+class TickerPrice(Ticker):
+    price: float | None = None

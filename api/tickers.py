@@ -4,7 +4,7 @@ from dependencies.users import get_current_user
 from database.database import get_session
 from database.models import UserModel
 from database.redis import get_redis
-from schemas.tickers import Ticker
+from schemas.tickers import Ticker, TickerPrice
 from schemas.relations import UserWithTickers
 import crud.tickers as crud_tickers
 from redis import Redis
@@ -83,26 +83,16 @@ async def unsubscribe_to_ticker(
     return user
 
 
-@router.get('/my_tickers', response_model=list[Ticker])
+@router.get('/my_tickers', response_model=list[TickerPrice])
 async def get_my_tickers(
     db: SessionDep,
+    redis: RedisDep,
     user: UserMeDep,
 ):
-    result = await crud_tickers.get_my_tickers(db, user)
-    return result
+    tickers = await crud_tickers.get_my_tickers(db, user)
 
-@router.get('/{symbol}', response_model=Ticker)
-async def get_ticker_info(
-    db: SessionDep,
-    symbol: str
-):
-    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
-
-    if ticker is None:
-        raise HTTPException(status_code=404, detail='Not found this ticker in db, to add him you must subcribe!')
-
-    return ticker
-
+    tickers_with_price = await crud_tickers.get_tickers_with_price(redis, tickers)
+    return tickers_with_price
 
 @router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
 async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
@@ -119,6 +109,24 @@ async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
         await crud_tickers.save_prices_in_redis(redis, data)
     
     return {'response' : data}
+
+
+@router.get('/{symbol}', response_model=TickerPrice)
+async def get_ticker_info(
+    db: SessionDep,
+    redis: RedisDep,
+    symbol: str
+):
+    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
+
+    if ticker is None:
+        raise HTTPException(status_code=404, detail='Not found this ticker in db, to add him you must subcribe!')
+
+    ticker_with_price = await crud_tickers.get_ticker_with_price(redis,ticker)
+
+    return ticker_with_price
+
+
 
 @router.websocket('/ws')
 async def ws_prices(websocket: WebSocket, redis: Annotated[Redis, Depends(get_redis)]):

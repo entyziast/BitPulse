@@ -6,7 +6,7 @@ from database.models import TickerModel, UserModel
 import json
 
 
-RELEVANT_TICKER_PRICE_EXPIRE_TIME_SECONDS = 60
+RELEVANT_TICKER_PRICE_EXPIRE_TIME_SECONDS = 120
 
 
 async def get_ticker_by_symbol(
@@ -96,7 +96,37 @@ async def unsubscribe_ticker(
     return user
 
 
+async def get_ticker_with_price(redis: Redis, ticker: TickerModel):
+    price = await redis.get(f'price:{ticker.symbol.upper()}')
+
+    return {
+        "id": ticker.id,
+        "symbol": ticker.symbol,
+        "name": ticker.name,
+        "price": float(price) if price else None
+    }
+
+
+async def get_tickers_with_price(redis: Redis, tickers: list[TickerModel]):
+    if not tickers:
+        return []
+
+    keys = [f'price:{t.symbol}' for t in tickers]
+    prices = await redis.mget(*keys)
+
+    result = []
+    for ticker, price in zip(tickers, prices):
+        result.append({
+            "id": ticker.id,
+            "symbol": ticker.symbol,
+            "name": ticker.name,
+            "price": float(price) if price else None
+        })
+    return result
+
+
+
 async def save_prices_in_redis(redis: Redis, data: list[str]):
     for ticker_data in data:
-        await redis.publish(f'prices{ticker_data['symbol']}', ticker_data['price'])
-        await redis.set(f'prices{ticker_data['symbol']}', ticker_data['price'], ex=RELEVANT_TICKER_PRICE_EXPIRE_TIME_SECONDS)
+        await redis.publish(f'price:{ticker_data['symbol']}', ticker_data['price'])
+        await redis.set(f'price:{ticker_data['symbol']}', ticker_data['price'], ex=RELEVANT_TICKER_PRICE_EXPIRE_TIME_SECONDS)
