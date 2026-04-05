@@ -91,6 +91,18 @@ async def get_my_tickers(
     result = await crud_tickers.get_my_tickers(db, user)
     return result
 
+@router.get('/{symbol}', response_model=Ticker)
+async def get_ticker_info(
+    db: SessionDep,
+    symbol: str
+):
+    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
+
+    if ticker is None:
+        raise HTTPException(status_code=404, detail='Not found this ticker in db, to add him you must subcribe!')
+
+    return ticker
+
 
 @router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
 async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
