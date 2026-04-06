@@ -48,12 +48,11 @@ async def get_user_with_prices(
 
     tickers_with_prices = await get_tickers_with_price(redis, user.tickers)
 
-
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "created_at": user.created_at,
+        "created_at": user.created_at, 
         "tickers": tickers_with_prices 
     }
 

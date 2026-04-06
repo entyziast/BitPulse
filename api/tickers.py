@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends, Path, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from dependencies.users import get_current_user
+from dependencies.users import get_current_user, get_current_user_ws
 from database.database import get_session
 from database.models import UserModel
 from database.redis import get_redis
@@ -24,6 +24,7 @@ router = APIRouter(
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserMeDep = Annotated[UserModel, Depends(get_current_user)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+UserMeWebSocketDep = Annotated[UserModel, Depends(get_current_user_ws)]
 
 
 tickers = [
@@ -122,26 +123,45 @@ async def get_ticker_info(
     if ticker is None:
         raise HTTPException(status_code=404, detail='Not found this ticker in db, to add him you must subcribe!')
 
-    ticker_with_price = await crud_tickers.get_ticker_with_price(redis,ticker)
+    ticker_with_price = await crud_tickers.get_ticker_with_price(redis, ticker)
 
     return ticker_with_price
 
 
 
 @router.websocket('/ws')
-async def ws_prices(websocket: WebSocket, redis: Annotated[Redis, Depends(get_redis)]):
+async def ws_prices(
+    websocket: WebSocket,
+    db: SessionDep,
+    user: UserMeWebSocketDep,
+    redis: RedisDep
+):
+    if user is None:
+        await websocket.accept()
+        await websocket.close(code=4008)
+        return
+
     await websocket.accept()
 
     pubsub = redis.pubsub()
-    await pubsub.subscribe('prices')
+    relevant_tickers = await crud_tickers.get_my_tickers(db, user)
+    relevant_channels = [f'price:{ticker.symbol}' for ticker in relevant_tickers]
+    await pubsub.subscribe(*relevant_channels)
+
     try:
         async for message in pubsub.listen():
             if message['type'] == 'message':
-                data = json.loads(message['data'])
+
+                symbol = message['channel'][6:]
+                price = float(message['data'])
+
+                data = {
+                    'symbol': symbol,
+                    'price': price
+                }
                 await websocket.send_json(data)
-                print(data)
-    except Exception:
+    except Exception as e:
         print(f"WS Error: {e}")
     finally:
-        await pubsub.unsubscribe('prices')
+        await pubsub.unsubscribe(*relevant_channels)
         await websocket.close()

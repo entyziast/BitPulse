@@ -1,6 +1,6 @@
 from redis import Redis
 from typing import Annotated
-from fastapi import Path, HTTPException, Depends
+from fastapi import Path, HTTPException, Depends, WebSocket, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import get_session
 from database.redis import get_redis
@@ -59,3 +59,19 @@ async def get_current_user_with_ticker_prices(
     user: Annotated[UserModel, Depends(get_current_user)],
 ):
     return await get_user_with_prices(db, redis, user)
+
+
+async def get_current_user_ws(
+    token: Annotated[str | None, Query()] = None,
+    db: AsyncSession = Depends(get_session),
+):
+    if not token:
+        raise HTTPException(status_code=403, detail='Need access_token')
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user = await get_user(db, username=username)
+        return user
+    except Exception:
+        return None
