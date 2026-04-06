@@ -4,6 +4,7 @@ from database.models import UserModel
 from schemas.users import CreateUser
 from passlib.context import CryptContext
 from redis.asyncio import Redis
+from crud.tickers import get_ticker_with_price, get_tickers_with_price
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -33,6 +34,29 @@ async def get_user(
         return None
     await db.refresh(user, ["tickers"])
     return user
+
+
+async def get_user_with_prices(
+    db: AsyncSession,
+    redis: Redis,
+    user: UserModel
+):
+    
+    if not user:
+        return None
+    await db.refresh(user, ["tickers"])
+
+    tickers_with_prices = await get_tickers_with_price(redis, user.tickers)
+
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "created_at": user.created_at,
+        "tickers": tickers_with_prices 
+    }
+
 
 
 async def create_user(db: AsyncSession, user: CreateUser):

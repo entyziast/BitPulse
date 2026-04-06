@@ -1,9 +1,11 @@
+from redis import Redis
 from typing import Annotated
 from fastapi import Path, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import get_session
+from database.redis import get_redis
 from database.models import UserModel
-from crud.users import get_user
+from crud.users import get_user, get_user_with_prices
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 
@@ -49,3 +51,11 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_current_user_with_ticker_prices(
+    db: Annotated[AsyncSession, Depends(get_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    user: Annotated[UserModel, Depends(get_current_user)],
+):
+    return await get_user_with_prices(db, redis, user)

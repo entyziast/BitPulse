@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, Path, HTTPException
 from database.database import get_session
+from database.redis import get_redis
 from database.models import UserModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 import crud.users as crud_users
 from schemas.users import ShowUser
-from schemas.relations import UserWithTickers
-from dependencies.users import get_current_user
+from schemas.relations import UserWithTickerPrices
+from dependencies.users import get_current_user_with_ticker_prices
+from redis import Redis
 
 
 router = APIRouter(
@@ -15,15 +17,18 @@ router = APIRouter(
 )
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
+
 
 @router.get('/', response_model=list[ShowUser])
 async def get_all_users(db: SessionDep) -> list[ShowUser]:
     return await crud_users.get_users(db)
 
-@router.get('/me', response_model=UserWithTickers)
+@router.get('/me', response_model=UserWithTickerPrices)
 async def get_user_me(
     db: SessionDep,
-    current_user: Annotated[UserModel, Depends(get_current_user)]
+    redis: RedisDep,
+    current_user: Annotated[UserModel, Depends(get_current_user_with_ticker_prices)]
 ):
     return current_user
 

@@ -13,7 +13,6 @@ from schemas.users import ShowUser, CreateUser, TokenResponse
 import crud.users as crud_users
 from dependencies.users import get_current_user
 
-load_dotenv()
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = os.getenv('ALGORITHM')
