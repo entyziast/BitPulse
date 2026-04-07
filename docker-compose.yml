@@ -11,6 +11,8 @@ services:
     container_name: bitpulse_app
     env_file:
       - .env
+    environment:
+      - PYTHONPATH=/app/fastapi_app
     ports:
       - "8000:8000"
     volumes:
@@ -19,6 +21,7 @@ services:
       - postgres
       - redis
       #- elasticsearch
+    command: ./entrypoint.sh 
     
 
   # База данных PostgreSQL
