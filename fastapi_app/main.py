@@ -3,11 +3,17 @@ import uvicorn
 from api import tickers, users, auth
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
-
+from contextlib import asynccontextmanager
+from worker.tasks import get_top50_tickers
 
 load_dotenv()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_top50_tickers.delay()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,6 +26,10 @@ app.add_middleware(
 app.include_router(tickers.router)
 app.include_router(users.router)
 app.include_router(auth.router)
+
+
+
+
 
 if __name__ == '__main__':
     uvicorn.run('main:app', reload=True)

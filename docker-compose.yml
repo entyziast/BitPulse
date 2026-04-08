@@ -11,8 +11,6 @@ services:
     container_name: bitpulse_app
     env_file:
       - .env
-    environment:
-      - PYTHONPATH=/app/fastapi_app
     ports:
       - "8000:8000"
     volumes:
@@ -23,6 +21,29 @@ services:
       #- elasticsearch
     command: ./entrypoint.sh 
     
+  # Воркер Celery (выполняет задачи)
+  worker:
+    build: .
+    container_name: bitpulse_worker
+    env_file: .env
+    volumes:
+      - .:/app
+    # Запускаем из модуля fastapi_app.worker (проверь путь к файлу с celery_app)
+    command: celery -A fastapi_app.worker.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - postgres
+
+  # Планировщик Celery (отправляет задачи по расписанию)
+  beat:
+    build: .
+    container_name: bitpulse_beat
+    env_file: .env
+    volumes:
+      - .:/app
+    command: celery -A fastapi_app.worker.celery_app beat --loglevel=info
+    depends_on:
+      - redis
 
   # База данных PostgreSQL
   postgres:
@@ -45,3 +66,4 @@ services:
     ports:
       - "6379:6379"
 
+  
