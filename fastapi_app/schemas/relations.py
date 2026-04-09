@@ -1,4 +1,4 @@
-from schemas import tickers, users
+from schemas import tickers, users, alerts
 from pydantic import BaseModel
 
 
@@ -10,3 +10,6 @@ class UserWithTickerPrices(users.ShowUser):
 
 class TickerWithSubcribers(tickers.Ticker):
     subcribers: list[users.ShowUser]
+
+class AlertWithTicker(alerts.AlertShow):
+    ticker: tickers.Ticker

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
-
+import datetime
 
 class AlertType(str, Enum):
     PRICE_THRESHOLD = "price_threshold"
@@ -21,11 +21,16 @@ class AlertBase(BaseModel):
     alert_type: AlertType
     alert_operator: AlertOperator
 
+
     model_config = {"from_attributes": True}
 
 
 class AlertCreate(AlertBase):
-    value: int
+    value: float
 
 class AlertShow(AlertBase):
-    target_value: int
+    id: int
+    is_active: bool
+    target_value: float
+    created_at: datetime.datetime
+    triggered_at: datetime.datetime | None = None

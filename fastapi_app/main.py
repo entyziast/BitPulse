@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
-from api import tickers, users, auth
+from api import tickers, users, auth, alerts
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -24,8 +24,10 @@ app.add_middleware(
 )
 
 app.include_router(tickers.router)
+app.include_router(alerts.router)
 app.include_router(users.router)
 app.include_router(auth.router)
+
 
 
 

@@ -48,9 +48,6 @@ class UserModel(Base):
     )
 
 
-
-
-
 class AlertModel(Base):
     __tablename__ = 'alerts'
 
@@ -59,13 +56,24 @@ class AlertModel(Base):
     ticker_id: Mapped[int] = mapped_column(ForeignKey("tickers.id", ondelete="CASCADE"))
 
     name: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
 
     alert_type: Mapped[AlertType] = mapped_column(Enum(AlertType), nullable=False)
     alert_operator: Mapped[AlertOperator] = mapped_column(Enum(AlertOperator), nullable=False)
-    target_value: Mapped[float] = mapped_column(Float,nullable=False)
+    target_value: Mapped[float] = mapped_column(Float, nullable=False)
 
-    is_active = Column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, 
+        default=datetime.datetime.utcnow
+    )
+    triggered_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, 
+        nullable=True
+    )
 
-    user = relationship("UserModel", back_populates="alerts")
+    user: Mapped["UserModel"] = relationship(back_populates="alerts")
     ticker: Mapped["TickerModel"] = relationship(back_populates="alerts")
+
+    @property
+    def symbol(self):
+        return self.ticker.symbol if self.ticker else None
