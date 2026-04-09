@@ -4,22 +4,7 @@ import httpx
 from .celery_app import celery_app
 from database.redis import get_redis
 from database.database import get_async_session_maker
-from crud.tickers import save_prices_in_redis, create_ticker, get_ticker_by_symbol
-
-
-
-tickers = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "TRXUSDT", "DOTUSDT",
-    "MATICUSDT", "LTCUSDT", "LINKUSDT", "BCHUSDT", "ATOMUSDT",
-    "XLMUSDT", "UNIUSDT", "ETCUSDT", "ICPUSDT", "FILUSDT",
-    "APTUSDT", "ARBUSDT", "OPUSDT", "NEARUSDT", "ALGOUSDT",
-    "VETUSDT", "HBARUSDT", "EGLDUSDT", "AAVEUSDT", "SANDUSDT",
-    "MANAUSDT", "AXSUSDT", "THETAUSDT", "FTMUSDT", "XTZUSDT",
-    "FLOWUSDT", "CHZUSDT", "GRTUSDT", "ENJUSDT", "KAVAUSDT",
-    "ZECUSDT", "DASHUSDT", "SNXUSDT", "CRVUSDT", "1INCHUSDT",
-    "RUNEUSDT", "LDOUSDT", "PEPEUSDT", "SHIBUSDT", "BLURUSDT"
-]
+from crud.tickers import save_prices_in_redis, create_ticker, get_ticker_by_symbol, get_all_symbols_for_celery
 
 
 @celery_app.task(name="update_prices_task")
@@ -29,16 +14,28 @@ def update_prices_task():
 
 
 async def request_to_binanceAPI_get_prices():
-    url = "https://api.binance.com/api/v3/ticker/price"
+    
+    session_factory = get_async_session_maker()
+    async with session_factory() as db:
+        symbols = await get_all_symbols_for_celery(db)
 
+    if not symbols:
+        return "No tickers found in database to update."
+
+    url = "https://api.binance.com/api/v3/ticker/price"
     params = {
-        'symbols' : json.dumps(tickers, separators=(",", ":"))
+        'symbols' : json.dumps(symbols, separators=(",", ":"))
     }
+    print(json.dumps(symbols, separators=(",", ":")))
 
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url, params=params)
             data = response.json()
+            if response.status_code != 200:
+                error_msg = data.get('msg', 'Unknown Binance Error')
+                print(f"!!! Binance rejected symbols: {error_msg}")
+                return f"Error: {error_msg}"
             
             redis = await get_redis()
             
@@ -56,6 +53,8 @@ def get_top50_tickers():
     return asyncio.run(request_get_top50_tickers())
 
 
+import re
+
 async def request_get_top50_tickers():
     url = 'https://api.binance.com/api/v3/ticker/24hr'
 
@@ -64,11 +63,14 @@ async def request_get_top50_tickers():
             response = await client.get(url)
             data = response.json()
 
-            tickers_usdt = [ticker for ticker in data if ticker['symbol'].endswith('USDT')]
+            tickers_usdt = [
+                ticker for ticker in data 
+                if ticker['symbol'].endswith('USDT') and re.match(r'^[A-Z0-9]+$', ticker['symbol'])
+            ]
 
             top50_tickers = sorted(
                 tickers_usdt,
-                key= lambda x:float(x['quoteVolume']),
+                key=lambda x: float(x['quoteVolume']),
                 reverse=True
             )[:50]
 
@@ -81,7 +83,7 @@ async def request_get_top50_tickers():
                     if not existing:
                         await create_ticker(db, symbol, symbol[:-4])
                 
-                return f"Successfully seeded top 50 tickers."
+                return f"Successfully seeded {len(top50_tickers)} clean tickers."
 
         except Exception as e:
-            print(f"Error in background task request_get_top50_tickers: {e}")
+            return f"Error in get_top50_tickers: {e}"

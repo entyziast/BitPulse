@@ -2,5 +2,5 @@ help.md
 .env
 venv
 __pycache__
-
+celerybeat-schedule
 

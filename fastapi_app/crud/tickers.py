@@ -37,6 +37,14 @@ async def get_all_tickers_info(
     return result.scalars().all()
 
 
+async def get_all_symbols_for_celery(
+    db: AsyncSession
+) -> list[str]:
+    stmt = select(TickerModel.symbol)
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def get_my_tickers(
     db: AsyncSession,
     user: UserModel
