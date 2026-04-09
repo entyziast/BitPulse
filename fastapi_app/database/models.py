@@ -1,6 +1,8 @@
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
-from sqlalchemy import Integer, String, DateTime, Text, Table, ForeignKey, Column
+from sqlalchemy import Integer, String, DateTime, Text, Table, ForeignKey, Column, Enum, Float, Boolean
 import datetime
+from schemas.alerts import AlertType, AlertOperator
+
 
 class Base(DeclarativeBase):
     pass
@@ -24,6 +26,7 @@ class TickerModel(Base):
         secondary=UserTickerTable,
         back_populates='tickers'
     )
+    alerts: Mapped[list["AlertModel"]] = relationship(back_populates="ticker")
 
 
 class UserModel(Base):
@@ -38,9 +41,31 @@ class UserModel(Base):
         secondary=UserTickerTable,
         back_populates='subscribers'
     )
+    alerts: Mapped[list['AlertModel']] = relationship(back_populates="user")
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, 
         default=datetime.datetime.utcnow
     )
 
 
+
+
+
+class AlertModel(Base):
+    __tablename__ = 'alerts'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    ticker_id: Mapped[int] = mapped_column(ForeignKey("tickers.id", ondelete="CASCADE"))
+
+    name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    alert_type: Mapped[AlertType] = mapped_column(Enum(AlertType), nullable=False)
+    alert_operator: Mapped[AlertOperator] = mapped_column(Enum(AlertOperator), nullable=False)
+    target_value: Mapped[float] = mapped_column(Float,nullable=False)
+
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("UserModel", back_populates="alerts")
+    ticker: Mapped["TickerModel"] = relationship(back_populates="alerts")

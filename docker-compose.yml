@@ -19,7 +19,7 @@ services:
       - postgres
       - redis
       #- elasticsearch
-    command: ./entrypoint.sh 
+    command: /app/entrypoint.sh 
     
   # Воркер Celery (выполняет задачи)
   worker:
@@ -33,6 +33,7 @@ services:
     depends_on:
       - redis
       - postgres
+      - app
 
   # Планировщик Celery (отправляет задачи по расписанию)
   beat:
@@ -44,6 +45,8 @@ services:
     command: celery -A fastapi_app.worker.celery_app beat --loglevel=info
     depends_on:
       - redis
+      - postgres
+      - app
 
   # База данных PostgreSQL
   postgres:
