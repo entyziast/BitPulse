@@ -1,10 +1,50 @@
 import asyncio
+import datetime
 import json
 import httpx
 from .celery_app import celery_app
 from database.redis import get_redis
 from database.database import get_async_session_maker
 from crud.tickers import save_prices_in_redis, create_ticker, get_ticker_by_symbol, get_all_symbols_for_celery
+from crud.alerts import get_all_active_alerts
+
+@celery_app.task(name='check_alerts_task')
+def check_alerts_task():
+    return asyncio.run(run_check_alerts())
+
+async def run_check_alerts():
+    
+    session_factory = get_async_session_maker()
+    async with session_factory() as db:
+        active_alerts = await get_all_active_alerts(db)
+    
+        import operator
+        OPERATORS = {
+            '>': operator.gt,
+            '>=': operator.ge,
+            '<': operator.lt,
+            '<=': operator.le,
+        }
+        
+        redis = await get_redis()
+        triggered_count = 0
+        for alert in active_alerts:
+            alert_price = await redis.get(f'price:{alert.ticker.symbol}')
+            if alert_price is None:
+                print(f"Price for {alert.ticker.symbol} not found in Redis.")
+                continue
+            alert_price = float(alert_price)
+            
+            
+            if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value):
+                alert.is_active = False
+                alert.triggered_at = datetime.datetime.utcnow()
+                triggered_count += 1
+
+        await db.commit()
+        await redis.aclose()
+    return f"Checked {len(active_alerts)} alerts, triggered {triggered_count}."
+
 
 
 @celery_app.task(name="update_prices_task")
@@ -26,7 +66,6 @@ async def request_to_binanceAPI_get_prices():
     params = {
         'symbols' : json.dumps(symbols, separators=(",", ":"))
     }
-    print(json.dumps(symbols, separators=(",", ":")))
 
     async with httpx.AsyncClient() as client:
         try:
@@ -40,6 +79,8 @@ async def request_to_binanceAPI_get_prices():
             redis = await get_redis()
             
             await save_prices_in_redis(redis, data)
+
+            check_alerts_task.delay()
 
             await redis.aclose()
             

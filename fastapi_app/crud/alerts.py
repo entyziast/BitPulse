@@ -67,3 +67,10 @@ async def delete_alert(
 ):
     await db.delete(alert)
     await db.commit()
+
+
+async def get_all_active_alerts(db: AsyncSession):
+    stmt = select(AlertModel).where(AlertModel.is_active==True).options(selectinload(AlertModel.ticker))
+    result = await db.execute(stmt)
+
+    return result.scalars().all()
