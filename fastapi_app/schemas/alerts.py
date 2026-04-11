@@ -9,6 +9,7 @@ class AlertType(str, Enum):
 
 class AlertStatus(str, Enum):
     ACTIVE = "active"
+    TRIGGERED = "triggered"
     INACTIVE = "inactive"
 
 class AlertOperator(str, Enum):
@@ -34,7 +35,7 @@ class AlertCreate(AlertBase):
 
 class AlertShow(AlertBase):
     id: int
-    is_active: bool
+    alert_status: AlertStatus
     target_value: float
     created_at: datetime.datetime
     triggered_at: datetime.datetime | None = None

@@ -24,7 +24,7 @@ AlertDep = Annotated[AlertModel, Depends(get_alert_dep)]
     '/my_alerts',
     summary='Get my alerts',
     description='Retrieve all alerts created by the current user',
-    response_model=list[AlertShow]
+    response_model=list[AlertWithTicker]
 )
 async def get_my_alerts(
     db: SessionDep,

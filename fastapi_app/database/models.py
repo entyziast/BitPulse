@@ -1,7 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 from sqlalchemy import Integer, String, DateTime, Text, Table, ForeignKey, Column, Enum, Float, Boolean
 import datetime
-from schemas.alerts import AlertType, AlertOperator
+from schemas.alerts import AlertType, AlertOperator, AlertStatus
 
 
 class Base(DeclarativeBase):
@@ -61,7 +61,8 @@ class AlertModel(Base):
     alert_operator: Mapped[AlertOperator] = mapped_column(Enum(AlertOperator), nullable=False)
     target_value: Mapped[float] = mapped_column(Float, nullable=False)
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    alert_status: Mapped[AlertStatus] = mapped_column(Enum(AlertStatus), default=AlertStatus.ACTIVE)
+
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, 
         default=datetime.datetime.utcnow

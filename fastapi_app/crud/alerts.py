@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel, AlertModel
 from schemas.alerts import AlertCreate, AlertType, AlertStatus
 from crud.tickers import get_ticker_by_symbol
+import datetime
 
 
 async def get_my_alerts(
@@ -70,7 +71,7 @@ async def delete_alert(
 
 
 async def get_all_active_alerts(db: AsyncSession):
-    stmt = select(AlertModel).where(AlertModel.is_active==True).options(selectinload(AlertModel.ticker))
+    stmt = select(AlertModel).where(AlertModel.alert_status==AlertStatus.ACTIVE).options(selectinload(AlertModel.ticker))
     result = await db.execute(stmt)
 
     return result.scalars().all()
@@ -82,10 +83,13 @@ async def set_alert_status(
     status: AlertStatus
 ):
     if status == AlertStatus.ACTIVE:
-        alert.is_active = True
+        alert.alert_status = AlertStatus.ACTIVE
         alert.triggered_at = None
+    elif status == AlertStatus.TRIGGERED:
+        alert.alert_status = AlertStatus.TRIGGERED
+        alert.triggered_at = datetime.datetime.utcnow()
     elif status == AlertStatus.INACTIVE:
-        alert.is_active = False
+        alert.alert_status = AlertStatus.INACTIVE
         alert.triggered_at = None
     else:
         return None

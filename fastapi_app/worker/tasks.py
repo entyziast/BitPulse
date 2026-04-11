@@ -5,6 +5,7 @@ import httpx
 from .celery_app import celery_app
 from database.redis import get_redis
 from database.database import get_async_session_maker
+from schemas.alerts import AlertStatus
 from crud.tickers import save_prices_in_redis, create_ticker, get_ticker_by_symbol, get_all_symbols_for_celery
 from crud.alerts import get_all_active_alerts
 
@@ -37,7 +38,7 @@ async def run_check_alerts():
             
             
             if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value):
-                alert.is_active = False
+                alert.alert_status = AlertStatus.TRIGGERED
                 alert.triggered_at = datetime.datetime.utcnow()
                 triggered_count += 1
 
