@@ -1,7 +1,6 @@
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis import Redis
-from database.redis import get_redis
 from database.models import TickerModel, UserModel
 import json
 

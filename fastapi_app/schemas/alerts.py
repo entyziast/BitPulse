@@ -1,8 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, ValidationInfo
 from enum import Enum
 import datetime
 
 class AlertType(str, Enum):
+    ALWAYS_TRIGGER = "always_trigger"
     PRICE_THRESHOLD = "price_threshold"
     #PRICE_PERCENT_CHANGE = "price_percent"
 
@@ -32,6 +33,12 @@ class AlertBase(BaseModel):
 
 class AlertCreate(AlertBase):
     value: float
+
+    @field_validator('value')
+    def validate_value(cls, v: float, info: ValidationInfo) -> float:
+        if info.data.get('alert_type') == AlertType.PRICE_THRESHOLD and v <= 0:
+            raise ValueError('Value must be greater than 0 for price threshold alerts')
+        return v
 
 class AlertShow(AlertBase):
     id: int

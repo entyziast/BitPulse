@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from redis import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 from schemas.alerts import AlertCreate, AlertShow, AlertStatus
 from schemas.relations import AlertWithTicker
 from dependencies.users import get_current_user
 from database.database import get_session
+from database.redis import get_redis
 from database.models import UserModel, AlertModel
 import crud.alerts as crud_alerts
 from dependencies.alerts import get_alert_dep
@@ -18,6 +20,7 @@ router = APIRouter(
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserMeDep = Annotated[UserModel, Depends(get_current_user)]
 AlertDep = Annotated[AlertModel, Depends(get_alert_dep)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
 
 
 @router.get(
@@ -62,12 +65,13 @@ async def get_my_alert(
 )
 async def create_alert(
     db: SessionDep,
+    redis: RedisDep,
     user: UserMeDep,
     alert: AlertCreate,
 ) -> AlertWithTicker:
-    new_alert = await crud_alerts.create_alert(db, user, alert)
+    new_alert = await crud_alerts.create_alert(db, redis, user, alert)
     if new_alert is None:
-        raise HTTPException(status_code=404, detail='Symbol does not exists')
+        raise HTTPException(status_code=400, detail='Error creating alert(wrong symbol or value).')
     return new_alert
 
 

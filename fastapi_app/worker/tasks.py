@@ -37,7 +37,7 @@ async def run_check_alerts():
             alert_price = float(alert_price)
             
             
-            if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value):
+            if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value) or alert.alert_type == AlertStatus.ALWAYS_TRIGGER:
                 alert.alert_status = AlertStatus.TRIGGERED
                 alert.triggered_at = datetime.datetime.utcnow()
                 triggered_count += 1
