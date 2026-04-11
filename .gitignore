@@ -3,4 +3,3 @@ help.md
 venv
 __pycache__
 celerybeat-schedule
-
