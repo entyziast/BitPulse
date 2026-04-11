@@ -116,15 +116,16 @@ async def request_get_top50_tickers():
             )[:50]
 
             session_factory = get_async_session_maker()
-
+            new_tickers_count = 0
             async with session_factory() as db:
                 for ticker in top50_tickers:
                     symbol = ticker['symbol']
                     existing = await get_ticker_by_symbol(db, symbol)
                     if not existing:
+                        new_tickers_count += 1
                         await create_ticker(db, symbol, symbol[:-4])
                 
-                return f"Successfully seeded {len(top50_tickers)} clean tickers."
+                return f"Successfully found {len(top50_tickers)} tickers. Added {new_tickers_count} new tickers into db."
 
         except Exception as e:
             return f"Error in get_top50_tickers: {e}"

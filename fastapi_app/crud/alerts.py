@@ -2,7 +2,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel, AlertModel
-from schemas.alerts import AlertCreate, AlertType
+from schemas.alerts import AlertCreate, AlertType, AlertStatus
 from crud.tickers import get_ticker_by_symbol
 
 
@@ -74,3 +74,22 @@ async def get_all_active_alerts(db: AsyncSession):
     result = await db.execute(stmt)
 
     return result.scalars().all()
+
+
+async def set_alert_status(
+    db: AsyncSession,
+    alert: AlertModel,
+    status: AlertStatus
+):
+    if status == AlertStatus.ACTIVE:
+        alert.is_active = True
+        alert.triggered_at = None
+    elif status == AlertStatus.INACTIVE:
+        alert.is_active = False
+        alert.triggered_at = None
+    else:
+        return None
+
+    await db.commit()
+    await db.refresh(alert, ["ticker"])
+    return alert

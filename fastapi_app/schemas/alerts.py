@@ -7,6 +7,10 @@ class AlertType(str, Enum):
     #PRICE_PERCENT_CHANGE = "price_percent"
 
 
+class AlertStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
 class AlertOperator(str, Enum):
     GT = '>'
     GE = '>='
