@@ -72,8 +72,6 @@ async def create_alert(
     alert: AlertCreate,
 ) -> AlertWithTicker:
     new_alert = await crud_alerts.create_alert(db, redis, user, alert)
-    if new_alert is None:
-        raise HTTPException(status_code=400, detail='Error creating alert(wrong symbol or value).')
     return new_alert
 
 
@@ -103,6 +101,4 @@ async def set_alert_status(
     status: Annotated[AlertStatus, Query(..., description='Status of the alert: active or inactive')]
 ) -> AlertWithTicker:
     result = await crud_alerts.set_alert_status(db, alert, status.value)
-    if result is None:
-        raise HTTPException(status_code=400, detail='Invalid status value')
     return result

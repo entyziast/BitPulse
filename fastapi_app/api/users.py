@@ -39,8 +39,6 @@ async def get_user(
 ) -> ShowUser:
     user = await crud_users.get_user(db, username=username)
 
-    if user is None:
-        raise HTTPException(status_code=404, detail="Not found this user")
     return user
 
 

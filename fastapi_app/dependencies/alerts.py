@@ -7,6 +7,7 @@ from database.database import get_session
 from database.redis import get_redis
 from database.models import UserModel, AlertModel
 from crud.alerts import get_alert
+from exceptions.user_exceptions import ForbiddenUserException
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -22,9 +23,7 @@ async def get_alert_dep(
     alert_id: Annotated[int, Path(title='Alert ID')],
 ) -> AlertModel:
     alert = await get_alert(db, alert_id)
-    if alert is None:
-        raise HTTPException(status_code=404, detail='This alert does not exist')
-    elif alert.user_id != user.id:
-        raise HTTPException(status_code=404, detail='Forbidden alert!')
+    if alert.user_id != user.id:
+        raise ForbiddenUserException()
 
     return alert

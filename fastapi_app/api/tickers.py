@@ -6,6 +6,7 @@ from database.models import UserModel
 from database.redis import get_redis
 from schemas.tickers import Ticker, TickerPrice
 from schemas.relations import UserWithTickers
+import exceptions.ticker_exceptions as ticker_exceptions
 import crud.tickers as crud_tickers
 from redis import Redis
 from database.redis import get_redis
@@ -34,9 +35,9 @@ async def subscribe_to_ticker(
     symbol: Annotated[str, Path(title='Name ticker')]
 ):
 
-    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
-
-    if ticker is None:
+    try:
+        ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
+    except ticker_exceptions.TickerNotFoundException:
         # Ticker not found in db
         url = 'https://api.binance.com/api/v3/exchangeInfo'
         params = {
@@ -52,7 +53,7 @@ async def subscribe_to_ticker(
                 name = ticker_data['baseAsset']
                 await crud_tickers.create_ticker(db, ticker_symbol=symbol, ticker_name=name)
             else:
-                raise HTTPException(status_code=response.status_code, detail='Error to find this ticker in Binance API')
+                raise ticker_exceptions.TickerNotExistInBinanceException(symbol)
 
     user = await crud_tickers.subscribe_ticker(db,symbol,user)
     return user
@@ -65,8 +66,6 @@ async def unsubscribe_to_ticker(
     symbol: str
 ):
     user = await crud_tickers.unsubscribe_ticker(db,symbol,user)
-    if user is None:
-        raise HTTPException(status_code=404, detail='Not found this ticker in db')
     return user
 
 
@@ -105,9 +104,6 @@ async def get_ticker_info(
     symbol: str
 ):
     ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
-
-    if ticker is None:
-        raise HTTPException(status_code=404, detail='Not found this ticker in db, to add him you must subcribe!')
 
     ticker_with_price = await crud_tickers.get_ticker_with_price(redis, ticker)
 

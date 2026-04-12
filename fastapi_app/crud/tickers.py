@@ -2,6 +2,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis import Redis
 from database.models import TickerModel, UserModel
+import exceptions.ticker_exceptions as ticker_exceptions
 import json
 
 
@@ -17,7 +18,10 @@ async def get_ticker_by_symbol(
     )
 
     result = await db.execute(stmt)
-    return result.scalar_one_or_none()
+    ticker = result.scalar_one_or_none()
+    if ticker is None:
+        raise ticker_exceptions.TickerNotFoundException(symbol)
+    return ticker
 
 
 async def get_all_tickers_info(
@@ -27,7 +31,7 @@ async def get_all_tickers_info(
 ):
     stmt = (
         select(TickerModel)
-        .order_by(TiсkerModel.symbol)
+        .order_by(TickerModel.symbol)
         .offset(offset=offset)
         .limit(limit=limit)
     )
@@ -73,7 +77,7 @@ async def subscribe_ticker(
 ):
     ticker = await get_ticker_by_symbol(db, symbol)
     if ticker is None:
-        return None
+        raise ticker_exceptions.TickerNotFoundException(symbol)
     
     await db.refresh(user, ["tickers"])
 
@@ -92,7 +96,7 @@ async def unsubscribe_ticker(
 ):
     ticker = await get_ticker_by_symbol(db, symbol)
     if ticker is None:
-        return None
+        raise ticker_exceptions.TickerNotFoundException(symbol)
 
     await db.refresh(user, ["tickers"])
 

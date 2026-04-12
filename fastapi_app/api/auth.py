@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from schemas.users import ShowUser, CreateUser, TokenResponse
 import crud.users as crud_users
 from dependencies.users import get_current_user
+import exceptions.user_exceptions as user_exceptions
 
 
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -29,8 +30,7 @@ router = APIRouter(
 @router.post('/registration', response_model=ShowUser, status_code=201)
 async def registration(db: SessionDep, user: CreateUser) -> ShowUser:
     new_user = await crud_users.create_user(db, user)
-    if new_user is None:
-        raise HTTPException(status_code=409, detail='This user already exists')
+
     return new_user
 
 
@@ -57,7 +57,7 @@ async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenResponse:
     if not await crud_users.verify_users(db, form.username, form.password):
-        raise HTTPException(status_code=400, detail='Wrong username or password!')
+        raise user_exceptions.UserWrongPasswordException()
 
     access_payload = {"sub": form.username}
     access_token = create_access_token(data=access_payload)
@@ -76,17 +76,16 @@ async def refresh_token(
     redis: RedisDep,
     refresh_token: str
 ) -> TokenResponse:
-    try:
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail='This is not refresh token')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    username = payload.get("sub")
+    if payload.get("type") != "refresh":
+        raise user_exceptions.UserErrorToUpdateRefreshTokenException(username)
+    
 
     
     if not (await crud_users.verify_refresh_token(redis, username, refresh_token)):
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise user_exceptions.UserErrorToUpdateRefreshTokenException(username)
 
     new_access = create_access_token({"sub": username})
     new_refresh = create_refresh_token({"sub": username})

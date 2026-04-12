@@ -5,6 +5,8 @@ from database.models import UserModel, AlertModel
 from schemas.alerts import AlertCreate, AlertType, AlertStatus
 from schemas.relations import AlertWithTicker
 from schemas.tickers import TickerPrice
+import exceptions.alert_exceptions as alert_exceptions
+from exceptions.ticker_exceptions import TickerNotFoundException
 from crud.tickers import get_ticker_with_price
 from redis import Redis
 from crud.tickers import get_ticker_by_symbol
@@ -58,7 +60,7 @@ async def get_alert(
     result = await db.execute(stmt)
     alert = result.scalar_one_or_none()
     if not alert:
-        return None
+        raise alert_exceptions.AlertNotFoundException()
     
     await db.refresh(alert, ['ticker'])
 
@@ -75,7 +77,7 @@ async def get_alert_with_ticker_price(
     result = await db.execute(stmt)
     alert = result.scalar_one_or_none()
     if not alert:
-        return None
+        raise alert_exceptions.AlertNotFoundException()
     
     await db.refresh(alert, ['ticker'])
 
@@ -98,7 +100,9 @@ async def get_alert_with_ticker_price(
 
 
 async def validate_target_value(redis: Redis, alert: dict) -> bool:
-    alert_symbol, alert_type, value = alert['symbol'], alert['alert_type'], alert['value']
+    alert_symbol, alert_type = alert['symbol'], alert['alert_type']
+    alert_operator, value = alert['alert_operator'], alert['value']
+
     import operator
     OPERATORS = {
         '>': operator.gt,
@@ -109,14 +113,14 @@ async def validate_target_value(redis: Redis, alert: dict) -> bool:
 
     if alert_type == AlertType.PRICE_THRESHOLD:
         if value <= 0:
-            return False
+            raise alert_exceptions.AlertPriceTresholdValidateException("Target value for price must be positive.")
         cur_price = await redis.get(f'price:{alert_symbol}')
-        if OPERATORS[alert['operator']](cur_price, value):
-            return False
+        if OPERATORS[alert_operator](float(cur_price), value):
+            raise alert_exceptions.AlertPriceTresholdValidateException("Target value for price already triggered.")
     elif alert_type == AlertType.ALWAYS_TRIGGER:
         return True
     else:
-        return False
+        raise alert_exceptions.AlertUnexpectedStatusException(alert_type)
     return True
 
 
@@ -128,13 +132,11 @@ async def create_alert(
 ):
     ticker = await get_ticker_by_symbol(db, alert.symbol)
     if ticker is None:
-        return None
+        raise TickerNotFoundException(alert.symbol)
 
     alert_dict = alert.model_dump()
 
-    is_valid = await validate_target_value(redis, alert_dict)
-    if not is_valid:
-        return None
+    await validate_target_value(redis, alert_dict)
 
     if alert_dict['alert_type'] == AlertType.PRICE_THRESHOLD:
         target_value = alert_dict['value']
@@ -187,7 +189,7 @@ async def set_alert_status(
         alert.alert_status = AlertStatus.INACTIVE
         alert.triggered_at = None
     else:
-        return None
+        raise alert_exceptions.AlertUnexpectedStatusException(status)
 
     await db.commit()
     await db.refresh(alert, ["ticker"])

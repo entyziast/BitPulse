@@ -5,6 +5,7 @@ from schemas.users import CreateUser
 from passlib.context import CryptContext
 from redis.asyncio import Redis
 from crud.tickers import get_ticker_with_price, get_tickers_with_price
+import exceptions.user_exceptions as user_exceptions
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -25,13 +26,13 @@ async def get_user(
     elif username is not None:
         stmt = select(UserModel).where(UserModel.username==username)
     else:
-        return None
+        raise user_exceptions.UserNotFoundException()
 
     
     result = await db.execute(stmt)
     user = result.scalars().one_or_none()
     if user is None:
-        return None
+        raise user_exceptions.UserNotFoundException()
     await db.refresh(user, ["tickers"])
     return user
 
@@ -43,7 +44,7 @@ async def get_user_with_prices(
 ):
     
     if not user:
-        return None
+        raise user_exceptions.UserNotFoundException()
     await db.refresh(user, ["tickers"])
 
     tickers_with_prices = await get_tickers_with_price(redis, user.tickers)
@@ -60,7 +61,8 @@ async def get_user_with_prices(
 
 async def create_user(db: AsyncSession, user: CreateUser):
     if await get_user(db, username=user.username):
-        return None
+        raise user_exceptions.UserAlreadyExistsException()
+
     hashed_password = pwd_context.hash(user.password)
     new_user = UserModel(**user.model_dump(exclude=['password']), hashed_password=hashed_password)
 
@@ -73,7 +75,7 @@ async def create_user(db: AsyncSession, user: CreateUser):
 async def verify_users(db: AsyncSession, username: str, password: str):
     user = await get_user(db, username=username)
     if user is None:
-        return False
+        raise user_exceptions.UserNotFoundException()
 
     return pwd_context.verify(password, user.hashed_password)
 
