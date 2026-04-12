@@ -12,4 +12,4 @@ class TickerWithSubcribers(tickers.Ticker):
     subcribers: list[users.ShowUser]
 
 class AlertWithTicker(alerts.AlertShow):
-    ticker: tickers.Ticker
+    ticker: tickers.TickerPrice

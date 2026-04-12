@@ -3,13 +3,17 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel, AlertModel
 from schemas.alerts import AlertCreate, AlertType, AlertStatus
+from schemas.relations import AlertWithTicker
+from schemas.tickers import TickerPrice
+from crud.tickers import get_ticker_with_price
 from redis import Redis
 from crud.tickers import get_ticker_by_symbol
 import datetime
 
 
-async def get_my_alerts(
+async def get_my_alerts_with_ticker_price(
     db: AsyncSession,
+    redis: Redis,
     user: UserModel,
 ):
     stmt = (
@@ -18,8 +22,32 @@ async def get_my_alerts(
         .options(selectinload(AlertModel.ticker))
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
-    
+    alerts = result.scalars().all()
+
+    keys = [f'price:{alert.ticker.symbol}' for alert in alerts]
+    prices = await redis.mget(*keys)
+
+    alerts_with_price = []
+    for alert, price in zip(alerts, prices):
+        ticker_price = TickerPrice(
+            id=alert.ticker.id,
+            symbol=alert.ticker.symbol,
+            name=alert.ticker.name,
+            price=float(price)
+        )
+        alerts_with_price.append(AlertWithTicker(
+            id=alert.id,
+            name=alert.name,
+            alert_type=alert.alert_type,
+            alert_operator=alert.alert_operator,
+            target_value=alert.target_value,
+            alert_status=alert.alert_status,
+            created_at=alert.created_at,
+            triggered_at=alert.triggered_at,
+            ticker=ticker_price
+        ))
+
+    return alerts_with_price
 
 async def get_alert(
     db: AsyncSession,
@@ -29,9 +57,44 @@ async def get_alert(
 
     result = await db.execute(stmt)
     alert = result.scalar_one_or_none()
-    if alert:
-        await db.refresh(alert, ['ticker'])
-    return alert 
+    if not alert:
+        return None
+    
+    await db.refresh(alert, ['ticker'])
+
+    return alert
+
+
+async def get_alert_with_ticker_price(
+    db: AsyncSession,
+    redis: Redis,
+    alert_id: int
+):
+    stmt = select(AlertModel).where(AlertModel.id==alert_id)
+
+    result = await db.execute(stmt)
+    alert = result.scalar_one_or_none()
+    if not alert:
+        return None
+    
+    await db.refresh(alert, ['ticker'])
+
+    ticker_with_price = await get_ticker_with_price(redis, alert.ticker)
+    ticker_price = TickerPrice(**ticker_with_price)
+    
+    return AlertWithTicker(
+        id=alert.id,
+        name=alert.name,
+        alert_type=alert.alert_type,
+        alert_operator=alert.alert_operator,
+        target_value=alert.target_value,
+        alert_status=alert.alert_status,
+        created_at=alert.created_at,
+        triggered_at=alert.triggered_at,
+        ticker=ticker_price
+    )
+
+
 
 
 async def validate_target_value(redis: Redis, alert: dict) -> bool:

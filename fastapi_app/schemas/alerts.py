@@ -23,7 +23,6 @@ class AlertOperator(str, Enum):
 class AlertBase(BaseModel):
 
     name: str | None = None
-    symbol: str
     alert_type: AlertType
     alert_operator: AlertOperator
 
@@ -32,6 +31,7 @@ class AlertBase(BaseModel):
 
 
 class AlertCreate(AlertBase):
+    symbol: str
     value: float
 
     @field_validator('value')

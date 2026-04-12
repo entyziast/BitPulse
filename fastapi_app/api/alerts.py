@@ -32,8 +32,9 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 async def get_my_alerts(
     db: SessionDep,
     user: UserMeDep,
+    redis: RedisDep
 ):
-    alerts = await crud_alerts.get_my_alerts(db, user)
+    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user)
     return alerts
 
 
@@ -46,10 +47,11 @@ async def get_my_alerts(
 )
 async def get_my_alert(
     db: SessionDep,
+    redis: RedisDep,
     alert: AlertDep
 ) -> AlertWithTicker:
 
-    return alert
+    return await crud_alerts.get_alert_with_ticker_price(db, redis, alert.id)
 
 
 @router.post(
