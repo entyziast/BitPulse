@@ -32,9 +32,11 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 async def get_my_alerts(
     db: SessionDep,
     user: UserMeDep,
-    redis: RedisDep
+    redis: RedisDep,
+    offset: Annotated[int | None, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10
 ):
-    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user)
+    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user, offset, limit)
     return alerts
 
 

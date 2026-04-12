@@ -17,11 +17,16 @@ async def get_my_alerts_with_ticker_price(
     db: AsyncSession,
     redis: Redis,
     user: UserModel,
+    offset: int | None = 0,
+    limit: int | None = 10
 ):
     stmt = (
         select(AlertModel)
         .where(AlertModel.user_id==user.id)
         .options(selectinload(AlertModel.ticker))
+        .order_by(AlertModel.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     result = await db.execute(stmt)
     alerts = result.scalars().all()

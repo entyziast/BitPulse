@@ -50,10 +50,19 @@ async def get_all_symbols_for_celery(
 
 async def get_my_tickers(
     db: AsyncSession,
-    user: UserModel
+    user: UserModel,
+    offset: int | None = 0,
+    limit: int | None = 10
 ):
-    await db.refresh(user, ["tickers"])
-    return user.tickers
+    stmt = (
+        select(TickerModel)
+        .where(TickerModel.subscribers.any(UserModel.id == user.id))
+        .order_by(TickerModel.id)
+        .offset(offset=offset)
+        .limit(limit=limit)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 async def create_ticker(

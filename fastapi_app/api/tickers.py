@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends, Path, HTTPException
+from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends, Path, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from dependencies.users import get_current_user, get_current_user_ws
 from database.database import get_session
@@ -74,11 +74,25 @@ async def get_my_tickers(
     db: SessionDep,
     redis: RedisDep,
     user: UserMeDep,
+    offset: Annotated[int | None, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10
 ):
-    tickers = await crud_tickers.get_my_tickers(db, user)
+    tickers = await crud_tickers.get_my_tickers(db, user, offset, limit)
 
     tickers_with_price = await crud_tickers.get_tickers_with_price(redis, tickers)
     return tickers_with_price
+
+
+@router.get('/all_tickers', response_model=list[Ticker])
+async def get_all_tickers(
+    db: SessionDep,
+    offset: Annotated[int | None, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10
+):
+    tickers = await crud_tickers.get_all_tickers_info(db, offset, limit)
+    return tickers
+
+
 
 @router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
 async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
