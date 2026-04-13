@@ -8,6 +8,7 @@ from database.database import get_async_session_maker
 from schemas.alerts import AlertStatus
 from crud.tickers import save_prices_in_redis, create_ticker, get_ticker_by_symbol, get_all_symbols_for_celery
 from crud.alerts import get_all_active_alerts
+from exceptions.ticker_exceptions import TickerNotFoundException
 
 @celery_app.task(name='check_alerts_task')
 def check_alerts_task():
@@ -121,8 +122,9 @@ async def request_get_top50_tickers():
             async with session_factory() as db:
                 for ticker in top50_tickers:
                     symbol = ticker['symbol']
-                    existing = await get_ticker_by_symbol(db, symbol)
-                    if not existing:
+                    try:
+                        await get_ticker_by_symbol(db, symbol)
+                    except TickerNotFoundException:
                         new_tickers_count += 1
                         await create_ticker(db, symbol, symbol[:-4])
                 
