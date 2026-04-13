@@ -20,11 +20,22 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 
 
-@router.get('/', response_model=list[ShowUser])
+@router.get(
+    '/', 
+    response_model=list[ShowUser],
+    summary='Get all users',
+    description='Retrieve a list of all users registered in the system'
+)
 async def get_all_users(db: SessionDep) -> list[ShowUser]:
     return await crud_users.get_users(db)
 
-@router.get('/me', response_model=UserWithTickerPrices)
+
+@router.get(
+    '/me', 
+    response_model=UserWithTickerPrices,
+    summary='Get current user',
+    description='Retrieve information about the currently authenticated user'
+)
 async def get_user_me(
     db: SessionDep,
     redis: RedisDep,
@@ -32,7 +43,13 @@ async def get_user_me(
 ):
     return current_user
 
-@router.get('/{username}', response_model=ShowUser)
+
+@router.get(
+    '/{username}', 
+    response_model=ShowUser,
+    summary='Get user by username',
+    description='Retrieve information about a specific user by their username'
+)
 async def get_user(
     db: SessionDep,
     username: Annotated[str, Path(max_length=16)]

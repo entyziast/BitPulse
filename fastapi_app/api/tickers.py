@@ -28,13 +28,20 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 UserMeWebSocketDep = Annotated[UserModel, Depends(get_current_user_ws)]
 
 
-@router.post('/subscribe/{symbol}', response_model=UserWithTickers, status_code=201)
+@router.post(
+    '/subscribe/{symbol}', 
+    response_model=UserWithTickers, 
+    status_code=201,
+    summary='Subscribe to ticker',
+    description='''Subscribe current user to ticker by symbol. 
+        If ticker does not exist in database, it will be created if it exists on BinanceAPI,
+        otherwise exception 404 will be raised.'''
+)
 async def subscribe_to_ticker(
     db: SessionDep,
     user: UserMeDep,
-    symbol: Annotated[str, Path(title='Name ticker')]
+    symbol: Annotated[str, Path(title='Name ticker')],
 ):
-
     try:
         ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
     except ticker_exceptions.TickerNotFoundException:
@@ -59,17 +66,28 @@ async def subscribe_to_ticker(
     return user
 
 
-@router.delete('/subscribe/{symbol}', response_model=UserWithTickers)
+@router.delete(
+    '/subscribe/{symbol}', 
+    response_model=UserWithTickers,
+    summary='Unsubscribe from ticker',
+    description='''Unsubscribe current user from ticker by symbol.
+        If user is not subscribed to ticker, nothing happens.'''
+)
 async def unsubscribe_to_ticker(
     db: SessionDep,
     user: UserMeDep,
-    symbol: str
+    symbol: str,
 ):
     user = await crud_tickers.unsubscribe_ticker(db,symbol,user)
     return user
 
 
-@router.get('/my_tickers', response_model=list[TickerPrice])
+@router.get(
+    '/my_tickers', 
+    response_model=list[TickerPrice],
+    summary='Get my tickers',
+    description='Retrieve a list of tickers with prices that the current user is subscribed to'
+)
 async def get_my_tickers(
     db: SessionDep,
     redis: RedisDep,
@@ -83,7 +101,12 @@ async def get_my_tickers(
     return tickers_with_price
 
 
-@router.get('/all_tickers', response_model=list[Ticker])
+@router.get(
+    '/all_tickers',
+    response_model=list[Ticker],
+    summary='Get all tickers',
+    description='Retrieve a list of all tickers available in the database'
+)
 async def get_all_tickers(
     db: SessionDep,
     offset: Annotated[int | None, Query(ge=0)] = 0,
@@ -93,8 +116,13 @@ async def get_all_tickers(
     return tickers
 
 
-
-@router.get('/polling_ticker_prices', description='HTTP request to Binance API, polling price tickers')
+@router.get(
+    '/polling_ticker_prices', 
+    summary='Polling ticker prices',
+    description='''Endpoint for polling ticker prices from Binance API.
+        This endpoint is intended to be used by Celery beat 
+        for periodic polling of ticker prices and saving them in Redis.'''
+)
 async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
     url = "https://api.binance.com/api/v3/ticker/price"
     
@@ -124,8 +152,7 @@ async def get_ticker_info(
     return ticker_with_price
 
 
-
-@router.websocket('/ws')
+@router.websocket('/ws', name='WebSocket for real-time ticker price updates')
 async def ws_prices(
     websocket: WebSocket,
     db: SessionDep,

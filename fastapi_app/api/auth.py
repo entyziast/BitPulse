@@ -27,14 +27,23 @@ router = APIRouter(
 )
 
 
-@router.post('/registration', response_model=ShowUser, status_code=201)
+@router.post(
+    '/registration', 
+    response_model=ShowUser, 
+    status_code=201,
+    summary='User registration',
+    description='Create a new user account with the provided username and password'
+)
 async def registration(db: SessionDep, user: CreateUser) -> ShowUser:
     new_user = await crud_users.create_user(db, user)
 
     return new_user
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(
+    data: dict, 
+    expires_delta: timedelta | None = None
+):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -50,7 +59,12 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "type": "refresh"}) 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-@router.post('/login', response_model=TokenResponse)
+@router.post(
+    '/login', 
+    response_model=TokenResponse,
+    summary='User login',
+    description='Authenticate user and return access and refresh bearer tokens'
+)
 async def login(
     db: SessionDep,
     redis: RedisDep,
@@ -71,7 +85,12 @@ async def login(
     )
     return response
 
-@router.post('/refresh', response_model=TokenResponse)
+@router.post(
+    '/refresh', 
+    response_model=TokenResponse,
+    summary='Refresh access token',
+    description='Refresh access token using valid refresh token'
+)
 async def refresh_token(
     redis: RedisDep,
     refresh_token: str
@@ -99,10 +118,14 @@ async def refresh_token(
     return response
 
 
-@router.get('/logout')
+@router.get(
+    '/logout',
+    summary='User logout',
+    description='Logout user from server by deleting refresh token from database'
+)
 async def logout(
     redis: RedisDep,
-    current_user: Annotated[ShowUser, Depends(get_current_user)]
+    current_user: Annotated[ShowUser, Depends(get_current_user)],
 ):
     result = await crud_users.delete_refresh_token(redis, current_user.username)
     return {"detail": "Logged out from server"}
