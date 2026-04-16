@@ -24,6 +24,21 @@ async def get_ticker_by_symbol(
     return ticker
 
 
+async def get_ticker_by_id(
+    db: AsyncSession,
+    id: int
+):
+    stmt = (
+        select(TickerModel).where(TickerModel.id==id)
+    )
+
+    result = await db.execute(stmt)
+    ticker = result.scalar_one_or_none()
+    if ticker is None:
+        raise ticker_exceptions.TickerIDNotFoundException(id)
+    return ticker
+
+
 async def get_all_tickers_info(
     db: AsyncSession,
     offset: int | None = 0,

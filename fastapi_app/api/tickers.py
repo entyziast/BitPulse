@@ -31,8 +31,8 @@ UserMeWebSocketDep = Annotated[UserModel, Depends(get_current_user_ws)]
 ElasticSearchDep = Annotated[AsyncElasticsearch, Depends(get_es_client)]
 
 
-@router.get('test/{ticker_id}')
-async def test(
+@router.get('/es_find/{ticker_id}')
+async def get_ticker_from_elasticsearch(
     es: ElasticSearchDep,
     ticker_id: int
 ):
@@ -155,13 +155,16 @@ async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
     return {'response' : data}
 
 
-@router.get('/{symbol}', response_model=TickerPrice)
+@router.get('/{id_or_symbol}', response_model=TickerPrice)
 async def get_ticker_info(
     db: SessionDep,
     redis: RedisDep,
-    symbol: str
+    id_or_symbol: str = Path(title='ID or symbol of ticker')
 ):
-    ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
+    if id_or_symbol.isdigit():
+        ticker = await crud_tickers.get_ticker_by_id(db, int(id_or_symbol))
+    else:
+        ticker = await crud_tickers.get_ticker_by_symbol(db, id_or_symbol)
 
     ticker_with_price = await crud_tickers.get_ticker_with_price(redis, ticker)
 
