@@ -106,6 +106,30 @@ async def request_to_binanceAPI_get_prices():
             print(f"Error in background task update_prices_task: {e}")
 
 
+@celery_app.task(name="sync_ticker_to_elasticsearch")
+def sync_ticker_to_elasticsearch(ticker_id: int, symbol: str, name: str):
+    return asyncio.run(fill_new_ticker_to_elasticsearch(ticker_id, symbol, name))
+
+
+async def fill_new_ticker_to_elasticsearch(ticker_id: int, symbol: str, name: str):
+    es = AsyncElasticsearch(hosts=[os.getenv('ELASTICSEARCH_URL')])
+
+    try:
+        doc = {
+            'symbol': symbol,
+            'name': name
+        }
+        await es.index(
+            index='tickers',
+            id=ticker_id,
+            document=doc
+        )
+        return f"Successfully indexed ticker {symbol} to Elasticsearch."
+
+    finally:
+        await es.close()
+
+
 @celery_app.task(name="sync_new_tickers_to_elasticsearch")
 def sync_new_tickers_to_elasticsearch():
     return asyncio.run(fill_elasticsearch())

@@ -83,6 +83,9 @@ async def create_ticker(
     db.add(new_ticker)
     await db.commit()
     await db.refresh(new_ticker)
+
+    from worker.tasks import sync_ticker_to_elasticsearch
+    sync_ticker_to_elasticsearch.delay(new_ticker.id, new_ticker.symbol, new_ticker.name)
     return new_ticker
 
 

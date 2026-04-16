@@ -61,6 +61,7 @@ async def subscribe_to_ticker(
         ticker = await crud_tickers.get_ticker_by_symbol(db, symbol)
     except ticker_exceptions.TickerNotFoundException:
         # Ticker not found in db
+        print(f"Ticker {symbol} not found in db. Trying to get info from Binance API...")
         url = 'https://api.binance.com/api/v3/exchangeInfo'
         params = {
             'symbol' : symbol.upper()
