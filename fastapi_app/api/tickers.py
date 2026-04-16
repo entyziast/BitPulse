@@ -11,6 +11,8 @@ import crud.tickers as crud_tickers
 from redis import Redis
 from database.redis import get_redis
 from typing import Annotated
+from elasticsearch import AsyncElasticsearch
+from database.elasticsearch import get_es_client
 
 import websockets
 import httpx
@@ -26,6 +28,19 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserMeDep = Annotated[UserModel, Depends(get_current_user)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 UserMeWebSocketDep = Annotated[UserModel, Depends(get_current_user_ws)]
+ElasticSearchDep = Annotated[AsyncElasticsearch, Depends(get_es_client)]
+
+
+@router.get('test/{ticker_id}')
+async def test(
+    es: ElasticSearchDep,
+    ticker_id: int
+):
+    try:
+        ticker = await es.get(index="tickers", id=ticker_id)
+    except Exception as e:
+        raise ticker_exceptions.ESNotFoundError(ticker_id)
+    return ticker
 
 
 @router.post(

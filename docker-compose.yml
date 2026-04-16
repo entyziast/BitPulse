@@ -2,7 +2,7 @@ version: '3.8'
 
 volumes:
   postgres_data:
-  #elastic_data:
+  elastic_data:
 
 services:
   # Основное приложение FastAPI
@@ -31,9 +31,15 @@ services:
     # Запускаем из модуля fastapi_app.worker (проверь путь к файлу с celery_app)
     command: celery -A fastapi_app.worker.celery_app worker --loglevel=info
     depends_on:
-      - redis
-      - postgres
-      - app
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+      app:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+      
 
   # Планировщик Celery (отправляет задачи по расписанию)
   beat:
@@ -68,5 +74,23 @@ services:
     container_name: bitpulse_redis
     ports:
       - "6379:6379"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: bitpulse_elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # WARNING! Disable security for development only
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - logger.level=warn
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
 
   
