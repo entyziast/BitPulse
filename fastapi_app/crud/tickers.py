@@ -1,5 +1,6 @@
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from elasticsearch import AsyncElasticsearch
 from redis import Redis
 from database.models import TickerModel, UserModel
 import exceptions.ticker_exceptions as ticker_exceptions
@@ -170,6 +171,23 @@ async def get_tickers_with_price(redis: Redis, tickers: list[TickerModel]):
         })
     return result
 
+
+async def search_ticker_in_es(es: AsyncElasticsearch, query: str, limit: int = 10):
+    query = {
+        "multi_match": {
+            "query": query,
+            "fields": ["symbol^2", "name"],
+            "fuzziness": "AUTO"
+        }
+    }
+
+    result = await es.search(index="tickers", query=query, size=limit)
+
+    tickers = [
+        {'id': hit['_id'], 'symbol': hit['_source']['symbol'], 'name': hit['_source']['name']}
+        for hit in result['hits']['hits']
+    ]
+    return tickers
 
 
 async def save_prices_in_redis(redis: Redis, data: list[str]):

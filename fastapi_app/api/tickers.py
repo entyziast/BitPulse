@@ -133,26 +133,19 @@ async def get_all_tickers(
 
 
 @router.get(
-    '/polling_ticker_prices', 
-    summary='Polling ticker prices',
-    description='''Endpoint for polling ticker prices from Binance API.
-        This endpoint is intended to be used by Celery beat 
-        for periodic polling of ticker prices and saving them in Redis.'''
+    '/search',
+    response_model=list[Ticker],
+    summary='Search tickers in Elasticsearch',
+    description='Search for tickers in Elasticsearch by name or symbol',
 )
-async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
-    url = "https://api.binance.com/api/v3/ticker/price"
-    
+async def search_tickers_in_es(
+    es: ElasticSearchDep,
+    query: Annotated[str, Query(min_length=1, max_length=20, title='Search query')],
+    limit: Annotated[int, Query(ge=1, le=100, title='Maximum number of results to return')] = 10
+):
+    return await crud_tickers.search_ticker_in_es(es, query, limit)
 
-    params = {
-        'symbols' : json.dumps(tickers, separators=(",", ":"))
-    }
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url,params=params)
-        data = response.json()
-        await crud_tickers.save_prices_in_redis(redis, data)
-    
-    return {'response' : data}
+
 
 
 @router.get('/{id_or_symbol}', response_model=TickerPrice)
@@ -207,3 +200,28 @@ async def ws_prices(
     finally:
         await pubsub.unsubscribe(*relevant_channels)
         await websocket.close()
+
+
+
+@router.get(
+    '/polling_ticker_prices', 
+    summary='Polling ticker prices',
+    description='''Endpoint for polling ticker prices from Binance API.
+        This endpoint is intended to be used by Celery beat 
+        for periodic polling of ticker prices and saving them in Redis.''',
+    deprecated=True,
+)
+async def polling_ticker_prices(redis: Annotated[Redis, Depends(get_redis)]):
+    url = "https://api.binance.com/api/v3/ticker/price"
+    
+
+    params = {
+        'symbols' : json.dumps(tickers, separators=(",", ":"))
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url,params=params)
+        data = response.json()
+        await crud_tickers.save_prices_in_redis(redis, data)
+    
+    return {'response' : data}
