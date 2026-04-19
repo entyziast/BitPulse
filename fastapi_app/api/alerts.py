@@ -34,9 +34,10 @@ async def get_my_alerts(
     user: UserMeDep,
     redis: RedisDep,
     offset: Annotated[int | None, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=50)] = 10
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    status: Annotated[AlertStatus | None, Query(description='Filter alerts by status')] = None
 ):
-    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user, offset, limit)
+    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user, offset, limit, status)
     return alerts
 
 

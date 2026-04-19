@@ -18,7 +18,8 @@ async def get_my_alerts_with_ticker_price(
     redis: Redis,
     user: UserModel,
     offset: int | None = 0,
-    limit: int | None = 10
+    limit: int | None = 10,
+    status: AlertStatus | None = None
 ):
     stmt = (
         select(AlertModel)
@@ -28,11 +29,17 @@ async def get_my_alerts_with_ticker_price(
         .offset(offset)
         .limit(limit)
     )
+    if status is not None:
+        stmt = stmt.where(AlertModel.alert_status==status)
+
     result = await db.execute(stmt)
     alerts = result.scalars().all()
 
     keys = [f'price:{alert.ticker.symbol}' for alert in alerts]
-    prices = await redis.mget(*keys)
+    if keys:
+        prices = await redis.mget(*keys)
+    else:
+        prices = []
 
     alerts_with_price = []
     for alert, price in zip(alerts, prices):
