@@ -5,6 +5,7 @@ from redis import Redis
 from database.models import TickerModel, UserModel
 import exceptions.ticker_exceptions as ticker_exceptions
 import json
+import os
 
 
 RELEVANT_TICKER_PRICE_EXPIRE_TIME_SECONDS = 120
@@ -172,7 +173,15 @@ async def get_tickers_with_price(redis: Redis, tickers: list[TickerModel]):
     return result
 
 
-async def search_ticker_in_es(es: AsyncElasticsearch, query: str, limit: int = 10):
+async def search_ticker_in_es(es: AsyncElasticsearch, redis: Redis, query: str, limit: int = 10):
+    cache_key = f'ticker:{query.strip().upper()}:limit:{limit}'
+    TTL = int(os.getenv('REDIS_TTL_TICKERS', 300))
+
+    cached_tickers = await redis.get(cache_key)
+    if cached_tickers:
+        await redis.expire(cache_key, TTL)
+        return json.loads(cached_tickers)
+        
     query = {
         "multi_match": {
             "query": query,
@@ -187,6 +196,9 @@ async def search_ticker_in_es(es: AsyncElasticsearch, query: str, limit: int = 1
         {'id': hit['_id'], 'symbol': hit['_source']['symbol'], 'name': hit['_source']['name']}
         for hit in result['hits']['hits']
     ]
+
+    if tickers:
+        await redis.set(cache_key, json.dumps(tickers), ex=TTL)
     return tickers
 
 

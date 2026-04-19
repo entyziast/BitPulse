@@ -136,14 +136,15 @@ async def get_all_tickers(
     '/search',
     response_model=list[Ticker],
     summary='Search tickers in Elasticsearch',
-    description='Search for tickers in Elasticsearch by name or symbol',
+    description='Search for tickers in Elasticsearch by name or symbol, use Redis for caching search results',
 )
 async def search_tickers_in_es(
     es: ElasticSearchDep,
+    redis: RedisDep,
     query: Annotated[str, Query(min_length=1, max_length=20, title='Search query')],
     limit: Annotated[int, Query(ge=1, le=100, title='Maximum number of results to return')] = 10
 ):
-    return await crud_tickers.search_ticker_in_es(es, query, limit)
+    return await crud_tickers.search_ticker_in_es(es, redis, query, limit)
 
 
 
