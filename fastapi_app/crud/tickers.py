@@ -192,13 +192,22 @@ async def search_ticker_in_es(es: AsyncElasticsearch, redis: Redis, query: str, 
 
     result = await es.search(index="tickers", query=query, size=limit)
 
-    tickers = [
-        {'id': hit['_id'], 'symbol': hit['_source']['symbol'], 'name': hit['_source']['name']}
-        for hit in result['hits']['hits']
-    ]
+    symbols = [f"price:{hit['_source']['symbol']}" for hit in result['hits']['hits']]
+    tickers_price = await redis.mget(*symbols)
 
-    if tickers:
-        await redis.set(cache_key, json.dumps(tickers), ex=TTL)
+    tickers = []
+    for hit, price in zip(result['hits']['hits'], tickers_price):
+
+        tickers.append(
+            {
+                'id': hit['_id'], 
+                'symbol': hit['_source']['symbol'], 
+                'name': hit['_source']['name'],
+                'price': float(price) if price is not None else 0.0
+            }
+        )
+
+    await redis.set(cache_key, json.dumps(tickers), ex=TTL)
     return tickers
 
 

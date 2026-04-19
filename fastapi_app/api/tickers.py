@@ -134,7 +134,7 @@ async def get_all_tickers(
 
 @router.get(
     '/search',
-    response_model=list[Ticker],
+    response_model=list[TickerPrice],
     summary='Search tickers in Elasticsearch',
     description='Search for tickers in Elasticsearch by name or symbol, use Redis for caching search results',
 )
