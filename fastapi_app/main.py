@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import uvicorn
-from api import tickers, users, auth, alerts
+from api import tickers, users, auth, alerts, telegram_webhook
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -30,6 +30,7 @@ app.include_router(tickers.router)
 app.include_router(alerts.router)
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(telegram_webhook.router)
 
 
 @app.exception_handler(BitPulseException)

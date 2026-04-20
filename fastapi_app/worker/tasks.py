@@ -21,7 +21,26 @@ from elasticsearch import AsyncElasticsearch
 from elasticsearch.helpers import async_bulk
 
 
+BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
+
+@celery_app.task(name='send_telegram_message')
+def send_telegram_message(chat_id: int, text: str):
+    return asyncio.run(send_message(chat_id, text))
+
+async def send_message(chat_id: int, text: str):
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML"
+                }
+            )
+        except Exception as e:
+            print(f"Error sending Telegram message to chat_id {chat_id}: {e}")
 
 
 
@@ -57,6 +76,13 @@ async def run_check_alerts():
                 alert.alert_status = AlertStatus.TRIGGERED
                 alert.triggered_at = datetime.datetime.utcnow()
                 triggered_count += 1
+                if alert.user.tg_chat_id is not None:
+                    send_telegram_message.delay(
+                        alert.user.tg_chat_id,
+                        f"🚨🚨🚨 <b>ALERT FOR {alert.ticker.symbol} TRIGGERED</b> 🚨🚨🚨\n"
+                        f"<b>{alert.ticker.symbol}</b> reached {alert_price}!\n"
+                        f"Alert condition: {alert.ticker.symbol} {alert.alert_operator.value} {alert.target_value}\n"
+                    )
 
         await db.commit()
         await redis.aclose()

@@ -1,5 +1,5 @@
 from sqlalchemy import select, delete
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel, AlertModel
 from schemas.alerts import AlertCreate, AlertType, AlertStatus
@@ -180,7 +180,14 @@ async def delete_alert(
 
 
 async def get_all_active_alerts(db: AsyncSession):
-    stmt = select(AlertModel).where(AlertModel.alert_status==AlertStatus.ACTIVE).options(selectinload(AlertModel.ticker))
+    stmt = (
+        select(AlertModel)
+        .where(AlertModel.alert_status == AlertStatus.ACTIVE)
+        .options(
+            joinedload(AlertModel.ticker),
+            joinedload(AlertModel.user)
+        )
+    )
     result = await db.execute(stmt)
 
     return result.scalars().all()

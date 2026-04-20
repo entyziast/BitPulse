@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import UserModel
 from schemas.users import CreateUser
@@ -70,6 +70,13 @@ async def create_user(db: AsyncSession, user: CreateUser):
     await db.commit()
     await db.refresh(new_user)
     return new_user
+
+
+async def save_chat_id(db: AsyncSession, user_id: int, chat_id: int):
+    stmt = update(UserModel).where(UserModel.id == user_id).values(tg_chat_id=chat_id)
+    await db.execute(stmt)
+    await db.commit()
+
 
 
 async def verify_users(db: AsyncSession, username: str, password: str):

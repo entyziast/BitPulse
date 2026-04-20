@@ -18,3 +18,8 @@ class AlertUnexpectedStatusException(BitPulseException):
         self.message = f"Unexpected alert status: {status}"
         self.status_code = 400
 
+
+class AlertNotificationAlreadyEnabledException(BitPulseException):
+    def __init__(self):
+        self.message = "Alert notification is already enabled."
+        self.status_code = 400

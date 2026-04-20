@@ -36,6 +36,7 @@ class UserModel(Base):
     username: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255))
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
+    tg_chat_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
     tickers: Mapped[list['TickerModel']] = relationship(
         'TickerModel',
         secondary=UserTickerTable,
