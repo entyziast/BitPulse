@@ -67,7 +67,10 @@ async def disable_tg_notifications(
     }
 
 
-@router.post('/telegram/webhook')
+@router.post(
+    '/telegram/webhook',
+    include_in_schema=False,
+)
 async def telegram_webhook(request: Request):
     data = await request.json()
     
@@ -94,7 +97,7 @@ async def telegram_webhook(request: Request):
                 async for db in  get_session():
                     user_id = int(user_id_bytes)
                     await save_chat_id(db, user_id, chat_id)
-                    send_telegram_message.delay(chat_id, "✅ Telegram подключен!")
+                    send_telegram_message.delay(chat_id, "✅ Telegram подключен! Теперь вы будете получать уведомления о срабатывании ваших алертов.")
                     break
             except ValueError:
                 send_telegram_message.delay(chat_id, "❌ Неверный формат команды. Пожалуйста, используйте /start <user_id>.")
