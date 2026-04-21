@@ -23,3 +23,10 @@ class AlertNotificationAlreadyEnabledException(BitPulseException):
     def __init__(self):
         self.message = "Alert notification is already enabled."
         self.status_code = 400
+
+
+
+class AlertNotificationAlreadyDisabledException(BitPulseException):
+    def __init__(self):
+        self.message = "Alert notification is already disabled."
+        self.status_code = 400

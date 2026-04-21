@@ -10,8 +10,7 @@ from database.redis import get_redis
 from database.models import UserModel, AlertModel
 import crud.alerts as crud_alerts
 from dependencies.alerts import get_alert_dep
-from exceptions.alert_exceptions import AlertNotificationAlreadyEnabledException
-import os
+
 
 
 router = APIRouter(
@@ -41,25 +40,6 @@ async def get_my_alerts(
 ):
     alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user, offset, limit, status)
     return alerts
-
-
-@router.get(
-    '/enable_tg_notifications',
-    summary='Enable Telegram notifications',
-)
-async def enable_tg_notifications(
-    user: UserMeDep,
-):
-    if user.tg_chat_id is not None:
-        raise AlertNotificationAlreadyEnabledException()
-
-    BOT_USERNAME = os.getenv('BOT_USERNAME')
-
-    tg_link = f"https://t.me/{BOT_USERNAME}?start={user.id}"
-    return {
-        'message': 'To enable Telegram notifications, please click the link below.',
-        'tg_link': tg_link
-    }
 
 
 @router.get(

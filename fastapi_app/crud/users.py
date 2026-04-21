@@ -78,6 +78,11 @@ async def save_chat_id(db: AsyncSession, user_id: int, chat_id: int):
     await db.commit()
 
 
+async def delete_chat_id(db: AsyncSession, user_id: int):
+    stmt = update(UserModel).where(UserModel.id == user_id).values(tg_chat_id=None)
+    await db.execute(stmt)
+    await db.commit()
+
 
 async def verify_users(db: AsyncSession, username: str, password: str):
     user = await get_user(db, username=username)
