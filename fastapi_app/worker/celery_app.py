@@ -20,4 +20,8 @@ celery_app.conf.beat_schedule = {
         "task": "update_prices_task",
         "schedule": 60.0,
     },
+    "update-price-history-every-10-minutes": {
+        "task": "update_price_history_task",
+        "schedule": 600.0,
+    }
 }

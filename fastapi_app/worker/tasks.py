@@ -16,6 +16,7 @@ from crud.tickers import (
     get_all_tickers_for_es,
 )
 from crud.alerts import get_all_active_alerts
+from crud.price_history import bulk_insert, delete_old_prices
 from exceptions.ticker_exceptions import TickerNotFoundException
 from elasticsearch import AsyncElasticsearch
 from elasticsearch.helpers import async_bulk
@@ -92,7 +93,6 @@ async def run_check_alerts():
 
 @celery_app.task(name="update_prices_task")
 def update_prices_task():
-    """Синхронная обертка для update_prices_task"""
     return asyncio.run(request_to_binanceAPI_get_prices())
 
 
@@ -131,6 +131,34 @@ async def request_to_binanceAPI_get_prices():
         except Exception as e:
             print(f"Error in background task update_prices_task: {e}")
 
+
+@celery_app.task(name="update_price_history_task")
+def update_price_history_task():
+    return asyncio.run(update_price_history())
+
+
+async def update_price_history():
+    session_factory = get_async_session_maker()
+
+    async with session_factory() as db:
+        tickers_info: list[int, str, str] = await get_all_tickers_for_es(db)
+        keys_for_redis = [f'price:{symbol}' for _,symbol,_ in tickers_info]
+
+        redis = await get_redis()
+        prices = await redis.mget(*keys_for_redis)
+        await redis.aclose()
+
+        data = [(ticker_info[0], float(price)) for ticker_info, price in zip(tickers_info, prices) if price is not None]
+
+        if data:
+            await bulk_insert(db, data)
+        
+        await delete_old_prices(db)
+
+        await db.commit()
+
+    return f"Inserted {len(data)} records into price history."
+        
 
 @celery_app.task(name="sync_ticker_to_elasticsearch")
 def sync_ticker_to_elasticsearch(ticker_id: int, symbol: str, name: str):
