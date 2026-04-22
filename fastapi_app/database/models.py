@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
-from sqlalchemy import Integer, String, DateTime, Text, Table, ForeignKey, Column, Enum, Float, Boolean
+from sqlalchemy import Integer, String, DateTime, Text, Table, ForeignKey, Column, Enum, Float, Boolean, Numeric
 import datetime
 from schemas.alerts import AlertType, AlertOperator, AlertStatus
 
@@ -14,6 +14,16 @@ UserTickerTable = Table(
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("ticker_id", Integer, ForeignKey("tickers.id", ondelete="CASCADE"), primary_key=True),
 )
+
+
+class TickerPriceHistoryModel(Base):
+    __tablename__ = 'ticker_price_history'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticker_id: Mapped[int] = mapped_column(ForeignKey('tickers.id', ondelete='CASCADE'), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(precision=20, scale=8), nullable=False)
+    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, index=True)
+
 
 class TickerModel(Base):
     __tablename__ = 'tickers'
