@@ -1,6 +1,7 @@
-from sqlalchemy import insert, delete
+from sqlalchemy import select, insert, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import TickerPriceHistoryModel
+from exceptions.ticker_exceptions import TickerIDNotFoundException
 import datetime
 
 
@@ -26,3 +27,19 @@ async def delete_old_prices(db: AsyncSession, older_than_hours: int = 24):
     stmt = delete(TickerPriceHistoryModel).where(TickerPriceHistoryModel.timestamp < cut_time)
     await db.execute(stmt)
     await db.commit()
+
+
+async def get_ticker_price_history(db: AsyncSession, ticker_id: int):
+    stmt = (
+        select(TickerPriceHistoryModel)
+        .where(TickerPriceHistoryModel.ticker_id == ticker_id)
+        .order_by(TickerPriceHistoryModel.timestamp.asc())
+    )
+
+    result = await db.execute(stmt)
+    ticker_price_history = result.scalars().all()
+
+    if len(ticker_price_history) == 0:
+        raise TickerIDNotFoundException(ticker_id)
+
+    return ticker_price_history

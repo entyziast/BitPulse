@@ -4,10 +4,11 @@ from dependencies.users import get_current_user, get_current_user_ws
 from database.database import get_session
 from database.models import UserModel
 from database.redis import get_redis
-from schemas.tickers import Ticker, TickerPrice
+from schemas.tickers import Ticker, TickerPrice, TickerPriceHistory
 from schemas.relations import UserWithTickers
 import exceptions.ticker_exceptions as ticker_exceptions
 import crud.tickers as crud_tickers
+import crud.price_history as crud_tickers_price_history
 from redis import Redis
 from database.redis import get_redis
 from typing import Annotated
@@ -201,6 +202,20 @@ async def ws_prices(
     finally:
         await pubsub.unsubscribe(*relevant_channels)
         await websocket.close()
+
+
+@router.get(
+    '/price_history/{ticker_id}',
+    summary='Get ticker price history',
+    description='Retrieve the price history of a specific ticker by its ID',
+    response_model=list[TickerPriceHistory]
+)
+async def get_ticker_price_history(
+    db: SessionDep,
+    ticker_id: int = Path(title='ID of the ticker')
+) -> list[TickerPriceHistory]:
+    return await crud_tickers_price_history.get_ticker_price_history(db, ticker_id)
+
 
 
 

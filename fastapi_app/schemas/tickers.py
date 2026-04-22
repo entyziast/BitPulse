@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+import datetime
 
 class TickerBase(BaseModel):
     symbol: str
@@ -16,3 +16,9 @@ class Ticker(TickerBase):
 
 class TickerPrice(Ticker):
     price: float | None = None
+
+class TickerPriceHistory(BaseModel):
+    price: float
+    timestamp: datetime.datetime
+
+    model_config = {"from_attributes": True}
