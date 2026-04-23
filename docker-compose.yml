@@ -28,7 +28,6 @@ services:
     env_file: .env
     volumes:
       - .:/app
-    # Запускаем из модуля fastapi_app.worker (проверь путь к файлу с celery_app)
     command: celery -A fastapi_app.worker.celery_app worker --loglevel=info
     depends_on:
       redis:
@@ -92,5 +91,16 @@ services:
       - "9200:9200"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
+
+  flower:
+    image: mher/flower:2.0
+    container_name: bitpulse_flower
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
 
   
