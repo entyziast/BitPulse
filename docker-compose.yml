@@ -83,10 +83,10 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - logger.level=warn
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200"]
-      interval: 5s
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status.*gold\\|green\\|yellow'"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     ports:
       - "9200:9200"
     volumes:
@@ -102,5 +102,16 @@ services:
     depends_on:
       - redis
       - worker
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    container_name: bitpulse_kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - I18N_LOCALE=ru-RU
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
 
   
