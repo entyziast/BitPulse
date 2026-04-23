@@ -44,6 +44,35 @@ async def send_message(chat_id: int, text: str):
             print(f"Error sending Telegram message to chat_id {chat_id}: {e}")
 
 
+@celery_app.task(name='send_telegram_alert_message')
+def send_telegram_alert_message(chat_id: int, alert_id: int, text: str):
+    return asyncio.run(send_message_with_buttons(chat_id, alert_id, text))
+
+async def send_message_with_buttons(chat_id: int, alert_id: int, text: str):
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🔄 Повторить", "callback_data": f"reactivate_alert:{alert_id}"},
+                {"text": "🗑️ Удалить", "callback_data": f"delete_alert:{alert_id}"}
+            ]
+        ]
+    }
+
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "reply_markup": keyboard
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json=payload
+            )
+        except Exception as e:
+            print(f"Error sending Telegram message to chat_id {chat_id}: {e}")
+
 
 @celery_app.task(name='check_alerts_task')
 def check_alerts_task():
@@ -78,8 +107,9 @@ async def run_check_alerts():
                 alert.triggered_at = datetime.datetime.utcnow()
                 triggered_count += 1
                 if alert.user.tg_chat_id is not None:
-                    send_telegram_message.delay(
+                    send_telegram_alert_message.delay(
                         alert.user.tg_chat_id,
+                        alert.id,
                         f"🚨🚨🚨 <b>ALERT FOR {alert.ticker.symbol} TRIGGERED</b> 🚨🚨🚨\n"
                         f"<b>{alert.ticker.symbol}</b> reached {alert_price}!\n"
                         f"Alert condition: {alert.ticker.symbol} {alert.alert_operator.value} {alert.target_value}\n"
