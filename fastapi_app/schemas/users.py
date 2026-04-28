@@ -2,14 +2,14 @@ from pydantic import BaseModel, EmailStr, Field
 import datetime
 
 class BaseUser(BaseModel):
-    username: str = Field(...,min_length=4, max_length=16)
+    username: str = Field(..., min_length=4, max_length=16)
     email: EmailStr
 
     model_config = {"from_attributes": True}
 
 
 class CreateUser(BaseUser):
-    password: str = Field(..., max_length=32)
+    password: str = Field(..., min_length=6, max_length=32)
 
 
 class ShowUser(BaseUser):

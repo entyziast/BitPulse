@@ -60,8 +60,13 @@ async def get_user_with_prices(
 
 
 async def create_user(db: AsyncSession, user: CreateUser):
-    if await get_user(db, username=user.username):
-        raise user_exceptions.UserAlreadyExistsException()
+    try:
+        await get_user(db, username=user.username)
+    except user_exceptions.UserNotFoundException:
+        pass
+    else:
+        raise user_exceptions.UserAlreadyExistException()
+
 
     hashed_password = pwd_context.hash(user.password)
     new_user = UserModel(**user.model_dump(exclude=['password']), hashed_password=hashed_password)
