@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from typing import Annotated
 import jwt
 import os
+import uuid
 from dotenv import load_dotenv
 from schemas.users import ShowUser, CreateUser, TokenResponse
 import crud.users as crud_users
@@ -50,14 +51,17 @@ def create_access_token(
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
+    to_encode.update({"jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 def create_refresh_token(data: dict):
     expire = datetime.now(timezone.utc) + timedelta(days=7)
     to_encode = data.copy()
-    to_encode.update({"exp": expire, "type": "refresh"}) 
+    to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid.uuid4())}) 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 @router.post(
     '/login', 
@@ -96,15 +100,18 @@ async def refresh_token(
     refresh_token: str
 ) -> TokenResponse:
     
-    payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-    username = payload.get("sub")
-    if payload.get("type") != "refresh":
-        raise user_exceptions.UserErrorToUpdateRefreshTokenException(username)
-    
-
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if payload.get("type") != "refresh":
+            raise user_exceptions.UserErrorToUpdateRefreshTokenException(username)
+    except jwt.ExpiredSignatureError:
+        raise user_exceptions.UserErrorRefreshTokenExpiredException()
+    except jwt.PyJWTError:
+        raise user_exceptions.UserErrorRefreshTokenWrongException()
     
     if not (await crud_users.verify_refresh_token(redis, username, refresh_token)):
-        raise user_exceptions.UserErrorToUpdateRefreshTokenException(username)
+        raise user_exceptions.UserErrorRefreshTokenWrongException()
 
     new_access = create_access_token({"sub": username})
     new_refresh = create_refresh_token({"sub": username})

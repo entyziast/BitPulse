@@ -25,6 +25,18 @@ class UserWrongPasswordException(BitPulseException):
         self.status_code = 401
 
 
+class UserErrorRefreshTokenWrongException(BitPulseException):
+    def __init__(self):
+        self.message = "Wrong refresh token! Try to enter correct credentials."
+        self.status_code = 401
+
+
+class UserErrorRefreshTokenExpiredException(BitPulseException):
+    def __init__(self):
+        self.message = "Wrong refresh token! Try to enter correct credentials."
+        self.status_code = 401
+
+
 class UserErrorToUpdateRefreshTokenException(BitPulseException):
     def __init__(self, username: str):
         self.message = f"Error to update refresh token for user with username '{username}'."
