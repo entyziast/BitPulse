@@ -1,4 +1,6 @@
 import pytest
+import respx
+from httpx import Response
 
 
 @pytest.mark.anyio
@@ -33,7 +35,14 @@ async def test_alerts(auth_ac, symbol, value, alert_type, alert_operator, expect
 
     assert create_response.status_code == 404
 
-    await auth_ac.post(f'tickers/subscribe/{symbol}')
+    with respx.mock:
+        respx.get("https://api.binance.com/api/v3/exchangeInfo").mock(
+            return_value=Response(200, json={
+                "symbols": [{"symbol": symbol, "baseAsset": symbol[:-4]}]
+            })
+        )
+
+        await auth_ac.post(f'tickers/subscribe/{symbol}')
 
     create_response = await auth_ac.post(
         '/alerts/', 

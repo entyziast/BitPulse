@@ -1,5 +1,6 @@
 import pytest
 import respx
+from httpx import Response
 
 
 @pytest.mark.anyio
@@ -13,14 +14,20 @@ async def test_subscribe_get_unsubscribe_ticker(
     expected_status_sub, 
     expected_status_get
 ):
-    response = await auth_ac.post(f'tickers/subscribe/{symbol}')
-    assert response.status_code == expected_status_sub
-    data = response.json()
+    with respx.mock:
+        respx.get("https://api.binance.com/api/v3/exchangeInfo", params={"symbol": "BTCUSDT"}).mock(
+            return_value=Response(200, json={"symbols": [{"symbol": "BTCUSDT", "baseAsset": "BTC"}]})
+        )
+        respx.get("https://api.binance.com/api/v3/exchangeInfo", params={"symbol": "ABCDEFZZZ"}).mock(
+            return_value=Response(404)
+        )
+        response = await auth_ac.post(f'tickers/subscribe/{symbol}')
+        assert response.status_code == expected_status_sub
+        data = response.json()
 
-    if response.status_code == 201:
-        assert any(ticker['symbol'] == symbol for ticker in data['tickers'])
+        if response.status_code == 201:
+            assert any(ticker['symbol'] == symbol for ticker in data['tickers'])
     
-
     response = await auth_ac.get(f'tickers/{symbol}')
     assert response.status_code == expected_status_get
 
