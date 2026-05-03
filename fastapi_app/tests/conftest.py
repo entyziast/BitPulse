@@ -26,7 +26,8 @@ def anyio_backend():
 
 @pytest.fixture(autouse=True, scope='session')
 async def prepare_db():
-    app.state.redis = from_url('redis://redis:6379/1', decode_responses=False)
+    redis_url = os.getenv('TEST_REDIS_URL', 'redis://localhost:6379/0')
+    app.state.redis = from_url(redis_url, decode_responses=False)
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
