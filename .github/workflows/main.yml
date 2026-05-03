@@ -69,4 +69,7 @@ jobs:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALGORITHM: HS256
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
+          BUCKET_CAPACITY: ${{ secrets.BUCKET_CAPACITY }}
+          TOKENS_PER_SECOND: ${{ secrets.TOKENS_PER_SECOND }}
         run: pytest -sv
