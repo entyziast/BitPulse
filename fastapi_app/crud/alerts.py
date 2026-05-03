@@ -47,7 +47,7 @@ async def get_my_alerts_with_ticker_price(
             id=alert.ticker.id,
             symbol=alert.ticker.symbol,
             name=alert.ticker.name,
-            price=float(price)
+            price=float(price) if price is not None else 0
         )
         alerts_with_price.append(AlertWithTicker(
             id=alert.id,
