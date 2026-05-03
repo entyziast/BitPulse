@@ -1,5 +1,6 @@
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from elasticsearch import AsyncElasticsearch
 from redis.asyncio import from_url
 from httpx import AsyncClient, ASGITransport
 from dotenv import load_dotenv
