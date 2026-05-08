@@ -11,9 +11,17 @@ from worker.tasks import get_top50_tickers
 from exceptions.main_exception import BitPulseException
 import os
 import datetime
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 load_dotenv()
+
+
+instrumentator = Instrumentator(
+    should_group_status_codes=True,
+    excluded_handlers=["/docs", "/redoc", "/metrics"],
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,7 +31,8 @@ async def lifespan(app: FastAPI):
     yield
     await redis_pool.close()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="BitPulse", lifespan=lifespan)
+instrumentator.instrument(app).expose(app)
 
 TOKENS_PER_SECOND=int(os.getenv('TOKENS_PER_SECOND'))
 BUCKET_CAPACITY=int(os.getenv('BUCKET_CAPACITY'))

@@ -3,6 +3,8 @@ version: '3.8'
 volumes:
   postgres_data:
   elastic_data:
+  prometheus_data:
+  grafana_data:
 
 services:
   # Основное приложение FastAPI
@@ -117,7 +119,7 @@ services:
       - elasticsearch
 
   test_db:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     profiles: ["test"]
     container_name: bitpulse_test_db
     environment:
@@ -126,3 +128,26 @@ services:
       - POSTGRES_DB=${TEST_DB_PORT}
     ports:
       - "${TEST_DB_PORT}:5432"
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["mertics"]
+    container_name: bitpulse_prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+    - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: ["mertics"]
+    container_name: bitpulse_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
