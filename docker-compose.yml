@@ -131,7 +131,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    profiles: ["mertics"]
+    profiles: ["metrics"]
     container_name: bitpulse_prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
@@ -141,7 +141,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    profiles: ["mertics"]
+    profiles: ["metrics"]
     container_name: bitpulse_grafana
     ports:
       - "3000:3000"
