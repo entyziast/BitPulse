@@ -63,8 +63,14 @@ class AlertModel(Base):
     __tablename__ = 'alerts'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    ticker_id: Mapped[int] = mapped_column(ForeignKey("tickers.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True
+    )
+    ticker_id: Mapped[int] = mapped_column(
+        ForeignKey("tickers.id", ondelete="CASCADE"),
+        index=True
+    )
 
     name: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
@@ -76,7 +82,8 @@ class AlertModel(Base):
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, 
-        default=datetime.datetime.utcnow
+        default=datetime.datetime.utcnow,
+        index=True,
     )
     triggered_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime, 

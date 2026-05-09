@@ -6,7 +6,6 @@ import re
 import os
 from .celery_app import celery_app
 from database.redis import get_redis
-from database.database import get_async_session_maker
 from schemas.alerts import AlertStatus
 from crud.tickers import (
     save_prices_in_redis, 
@@ -20,9 +19,13 @@ from crud.price_history import bulk_insert, delete_old_prices
 from exceptions.ticker_exceptions import TickerNotFoundException
 from elasticsearch import AsyncElasticsearch
 from elasticsearch.helpers import async_bulk
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
 
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+DATABASE_URL = os.getenv('DATABASE_URL')
+
 
 
 @celery_app.task(name='send_telegram_message')
@@ -79,44 +82,51 @@ def check_alerts_task():
     return asyncio.run(run_check_alerts())
 
 async def run_check_alerts():
-    
-    session_factory = get_async_session_maker()
-    async with session_factory() as db:
-        active_alerts = await get_all_active_alerts(db)
-    
-        import operator
-        OPERATORS = {
-            '>': operator.gt,
-            '>=': operator.ge,
-            '<': operator.lt,
-            '<=': operator.le,
-        }
-        
-        redis = await get_redis()
-        triggered_count = 0
-        for alert in active_alerts:
-            alert_price = await redis.get(f'price:{alert.ticker.symbol}')
-            if alert_price is None:
-                print(f"Price for {alert.ticker.symbol} not found in Redis.")
-                continue
-            alert_price = float(alert_price)
-            
-            
-            if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value) or alert.alert_type == AlertStatus.ALWAYS_TRIGGER:
-                alert.alert_status = AlertStatus.TRIGGERED
-                alert.triggered_at = datetime.datetime.utcnow()
-                triggered_count += 1
-                if alert.user.tg_chat_id is not None:
-                    send_telegram_alert_message.delay(
-                        alert.user.tg_chat_id,
-                        alert.id,
-                        f"🚨🚨🚨 <b>ALERT FOR {alert.ticker.symbol} TRIGGERED</b> 🚨🚨🚨\n"
-                        f"<b>{alert.ticker.symbol}</b> reached {alert_price}!\n"
-                        f"Alert condition: {alert.ticker.symbol} {alert.alert_operator.value} {alert.target_value}\n"
-                    )
+    local_engine = create_async_engine(
+        os.getenv('DATABASE_URL'),
+        poolclass=NullPool 
+    )
+    session_factory = async_sessionmaker(local_engine, expire_on_commit=False)
 
-        await db.commit()
-        await redis.aclose()
+    try:
+        async with session_factory() as db:
+            active_alerts = await get_all_active_alerts(db)
+        
+            import operator
+            OPERATORS = {
+                '>': operator.gt,
+                '>=': operator.ge,
+                '<': operator.lt,
+                '<=': operator.le,
+            }
+            
+            redis = await get_redis()
+            triggered_count = 0
+            for alert in active_alerts:
+                alert_price = await redis.get(f'price:{alert.ticker.symbol}')
+                if alert_price is None:
+                    print(f"Price for {alert.ticker.symbol} not found in Redis.")
+                    continue
+                alert_price = float(alert_price)
+                
+                
+                if OPERATORS[alert.alert_operator.value](alert_price, alert.target_value) or alert.alert_type == AlertStatus.ALWAYS_TRIGGER:
+                    alert.alert_status = AlertStatus.TRIGGERED
+                    alert.triggered_at = datetime.datetime.utcnow()
+                    triggered_count += 1
+                    if alert.user.tg_chat_id is not None:
+                        send_telegram_alert_message.delay(
+                            alert.user.tg_chat_id,
+                            alert.id,
+                            f"🚨🚨🚨 <b>ALERT FOR {alert.ticker.symbol} TRIGGERED</b> 🚨🚨🚨\n"
+                            f"<b>{alert.ticker.symbol}</b> reached {alert_price}!\n"
+                            f"Alert condition: {alert.ticker.symbol} {alert.alert_operator.value} {alert.target_value}\n"
+                        )
+
+            await db.commit()
+            await redis.aclose()
+    finally:
+        await local_engine.dispose()
     return f"Checked {len(active_alerts)} alerts, triggered {triggered_count}."
 
 
@@ -127,10 +137,16 @@ def update_prices_task():
 
 
 async def request_to_binanceAPI_get_prices():
-    
-    session_factory = get_async_session_maker()
-    async with session_factory() as db:
-        symbols = await get_all_symbols_for_celery(db)
+    local_engine = create_async_engine(
+        os.getenv('DATABASE_URL'),
+        poolclass=NullPool 
+    )
+    session_factory = async_sessionmaker(local_engine, expire_on_commit=False)
+    try:
+        async with session_factory() as db:
+            symbols = await get_all_symbols_for_celery(db)
+    finally:
+        await local_engine.dispose()
 
     if not symbols:
         return "No tickers found in database to update."
@@ -168,24 +184,31 @@ def update_price_history_task():
 
 
 async def update_price_history():
-    session_factory = get_async_session_maker()
+    local_engine = create_async_engine(
+        os.getenv('DATABASE_URL'),
+        poolclass=NullPool 
+    )
+    session_factory = async_sessionmaker(local_engine, expire_on_commit=False)
 
-    async with session_factory() as db:
-        tickers_info: list[int, str, str] = await get_all_tickers_for_es(db)
-        keys_for_redis = [f'price:{symbol}' for _,symbol,_ in tickers_info]
+    try:
+        async with session_factory() as db:
+            tickers_info: list[int, str, str] = await get_all_tickers_for_es(db)
+            keys_for_redis = [f'price:{symbol}' for _,symbol,_ in tickers_info]
 
-        redis = await get_redis()
-        prices = await redis.mget(*keys_for_redis)
-        await redis.aclose()
+            redis = await get_redis()
+            prices = await redis.mget(*keys_for_redis)
+            await redis.aclose()
 
-        data = [(ticker_info[0], float(price)) for ticker_info, price in zip(tickers_info, prices) if price is not None]
+            data = [(ticker_info[0], float(price)) for ticker_info, price in zip(tickers_info, prices) if price is not None]
 
-        if data:
-            await bulk_insert(db, data)
-        
-        await delete_old_prices(db)
+            if data:
+                await bulk_insert(db, data)
+            
+            await delete_old_prices(db)
 
-        await db.commit()
+            await db.commit()
+    finally:
+        await local_engine.dispose()
 
     return f"Inserted {len(data)} records into price history."
         
@@ -227,9 +250,16 @@ async def fill_elasticsearch():
             await es.indices.create(index="tickers", mappings=ES_TICKERS_MAPPING)
             # index is empty, we must fill it with all tickers from db
 
-        session_factory = get_async_session_maker()
-        async with session_factory() as db:
-            tickers_info = await get_all_tickers_for_es(db)
+        local_engine = create_async_engine(
+            os.getenv('DATABASE_URL'),
+            poolclass=NullPool 
+        )
+        session_factory = async_sessionmaker(local_engine, expire_on_commit=False)
+        try:
+            async with session_factory() as db:
+                tickers_info = await get_all_tickers_for_es(db)
+        finally:
+            await local_engine.dispose()
 
         actions = [
             {
@@ -274,20 +304,27 @@ async def request_get_top50_tickers():
                 reverse=True
             )[:50]
 
-            session_factory = get_async_session_maker()
+            local_engine = create_async_engine(
+                os.getenv('DATABASE_URL'),
+                poolclass=NullPool 
+            )
+            session_factory = async_sessionmaker(local_engine, expire_on_commit=False)
             new_tickers_count = 0
 
-            async with session_factory() as db:
-                for ticker in top50_tickers:
-                    symbol = ticker['symbol']
-                    try:
-                        await get_ticker_by_symbol(db, symbol)
-                    except TickerNotFoundException:
-                        new_tickers_count += 1
-                        new_ticker = await create_ticker(db, symbol, symbol[:-4])
+            try:
+                async with session_factory() as db:
+                    for ticker in top50_tickers:
+                        symbol = ticker['symbol']
+                        try:
+                            await get_ticker_by_symbol(db, symbol)
+                        except TickerNotFoundException:
+                            new_tickers_count += 1
+                            new_ticker = await create_ticker(db, symbol, symbol[:-4])
 
-                sync_new_tickers_to_elasticsearch.delay()
-                return f"Successfully found {len(top50_tickers)} tickers. Added {new_tickers_count} new tickers into db."
+                    sync_new_tickers_to_elasticsearch.delay()
+                    return f"Successfully found {len(top50_tickers)} tickers. Added {new_tickers_count} new tickers into db."
+            finally:
+                await local_engine.dispose()
 
         except Exception as e:
             return f"Error in get_top50_tickers: {e}"

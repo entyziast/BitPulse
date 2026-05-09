@@ -1,33 +1,25 @@
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from dotenv import load_dotenv
 import os
 
 
-load_dotenv()
+DATABASE_URL = os.getenv('DATABASE_URL')
 
+async_engine = create_async_engine(
+    url=DATABASE_URL,
+    pool_size=30,
+    max_overflow=10,
+    pool_timeout=5,
+)
 
-def get_async_engine():
-    return create_async_engine(
-        url=os.getenv('DATABASE_URL'),
-        future=True,
-        pool_size=30,
-        max_overflow=10,
-        pool_timeout=5,
-    )
-
-
-def get_async_session_maker():
-    async_engine = get_async_engine()
-    return async_sessionmaker(
-        async_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+async_session_factory = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 async def get_session():
-    session_maker = get_async_session_maker()
-    async with session_maker() as session:
-        yield session   
+    async with async_session_factory() as session:
+        yield session
 
