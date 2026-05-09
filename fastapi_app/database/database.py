@@ -11,6 +11,9 @@ def get_async_engine():
     return create_async_engine(
         url=os.getenv('DATABASE_URL'),
         future=True,
+        pool_size=30,
+        max_overflow=10,
+        pool_timeout=5,
     )
 
 

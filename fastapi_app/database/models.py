@@ -42,7 +42,7 @@ class TickerModel(Base):
 class UserModel(Base):
     __tablename__ = 'users'
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255))
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
