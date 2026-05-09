@@ -1,11 +1,12 @@
 from fastapi import APIRouter, WebSocket, BackgroundTasks, Depends, Path, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from dependencies.users import get_current_user, get_current_user_ws
+from dependencies.users import get_current_user, get_current_user_ws, get_check_token_data
 from database.database import get_session
 from database.models import UserModel
 from database.redis import get_redis
 from schemas.tickers import Ticker, TickerPrice, TickerPriceHistory
 from schemas.relations import UserWithTickers
+from schemas.users import TokenData
 import exceptions.ticker_exceptions as ticker_exceptions
 import crud.tickers as crud_tickers
 import crud.price_history as crud_tickers_price_history
@@ -27,6 +28,7 @@ router = APIRouter(
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserMeDep = Annotated[UserModel, Depends(get_current_user)]
+AuthMeDep = Annotated[TokenData, Depends(get_check_token_data)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 UserMeWebSocketDep = Annotated[UserModel, Depends(get_current_user_ws)]
 ElasticSearchDep = Annotated[AsyncElasticsearch, Depends(get_es_client)]
@@ -108,11 +110,11 @@ async def unsubscribe_to_ticker(
 async def get_my_tickers(
     db: SessionDep,
     redis: RedisDep,
-    user: UserMeDep,
+    user_data: AuthMeDep,
     offset: Annotated[int | None, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=50)] = 10
 ):
-    tickers = await crud_tickers.get_my_tickers(db, user, offset, limit)
+    tickers = await crud_tickers.get_my_tickers(db, user_data.user_id, offset, limit)
 
     tickers_with_price = await crud_tickers.get_tickers_with_price(redis, tickers)
     return tickers_with_price
@@ -181,7 +183,7 @@ async def ws_prices(
     await websocket.accept()
 
     pubsub = redis.pubsub()
-    relevant_tickers = await crud_tickers.get_my_tickers(db, user)
+    relevant_tickers = await crud_tickers.get_my_tickers(db, user.id)
     relevant_channels = [f'price:{ticker.symbol}' for ticker in relevant_tickers]
     await pubsub.subscribe(*relevant_channels)
 

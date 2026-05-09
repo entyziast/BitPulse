@@ -6,6 +6,7 @@ from database.database import get_session
 from database.redis import get_redis
 from database.models import UserModel
 from crud.users import get_user, get_user_with_prices
+from schemas.users import TokenData
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 
@@ -28,6 +29,28 @@ async def get_user_or_404(
         raise HTTPException(status_code=404, detail='This user is not found')
     return user
 
+
+async def get_check_token_data(
+    token: str = Depends(oauth2_scheme),
+) -> TokenData:
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("uid")
+        username = payload.get("sub")
+
+        if username is None or user_id is None:
+            raise credentials_exception
+
+        return TokenData(user_id=user_id, username=username)
+    except jwt.exceptions.InvalidTokenError:
+        raise credentials_exception
+    except jwt.exceptions.PyJWTError:
+        raise HTTPException(status_code=400, detail='Unexpected error')
+    
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

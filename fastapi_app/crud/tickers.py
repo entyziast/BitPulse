@@ -75,13 +75,14 @@ async def get_all_tickers_for_es(
 
 async def get_my_tickers(
     db: AsyncSession,
-    user: UserModel,
+    user_id: int,
     offset: int | None = 0,
     limit: int | None = 10
 ):
     stmt = (
         select(TickerModel)
-        .where(TickerModel.subscribers.any(UserModel.id == user.id))
+        .join(TickerModel.subscribers) 
+        .where(UserModel.id == user_id)
         .order_by(TickerModel.id)
         .offset(offset=offset)
         .limit(limit=limit)

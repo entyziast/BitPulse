@@ -94,7 +94,10 @@ async def verify_users(db: AsyncSession, username: str, password: str):
     if user is None:
         raise user_exceptions.UserNotFoundException()
 
-    return pwd_context.verify(password, user.hashed_password)
+    if not pwd_context.verify(password, user.hashed_password):
+        raise user_exceptions.UserWrongPasswordException()
+
+    return user.id
 
 
 REFRESH_TOKEN_EXPIRE_DAYS = 7

@@ -74,10 +74,12 @@ async def login(
     redis: RedisDep,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenResponse:
-    if not await crud_users.verify_users(db, form.username, form.password):
-        raise user_exceptions.UserWrongPasswordException()
-
-    access_payload = {"sub": form.username}
+    user_id = await crud_users.verify_users(db, form.username, form.password)
+        
+    access_payload = {
+        "sub": form.username,
+        "uid": user_id
+    }
     access_token = create_access_token(data=access_payload)
     refresh_token = create_refresh_token(data=access_payload)
 
