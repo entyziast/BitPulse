@@ -1,7 +1,7 @@
 from sqlalchemy import select, delete
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.models import UserModel, AlertModel
+from database.models import UserModel, AlertModel, TickerModel
 from schemas.alerts import AlertCreate, AlertType, AlertStatus
 from schemas.relations import AlertWithTicker
 from schemas.tickers import TickerPrice
@@ -16,39 +16,34 @@ import datetime
 async def get_my_alerts_with_ticker_price(
     db: AsyncSession,
     redis: Redis,
-    user: UserModel,
-    offset: int | None = 0,
-    limit: int | None = 10,
+    user_id: int,
+    offset: int = 0,
+    limit: int = 10,
     status: AlertStatus | None = None
 ):
     stmt = (
-        select(AlertModel)
-        .where(AlertModel.user_id==user.id)
-        .options(selectinload(AlertModel.ticker))
+        select(AlertModel, TickerModel)
+        .join(TickerModel, AlertModel.ticker_id == TickerModel.id)
+        .where(AlertModel.user_id == user_id)
         .order_by(AlertModel.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
+    
     if status is not None:
-        stmt = stmt.where(AlertModel.alert_status==status)
+        stmt = stmt.where(AlertModel.alert_status == status)
 
     result = await db.execute(stmt)
-    alerts = result.scalars().all()
+    rows = result.all()
 
-    keys = [f'price:{alert.ticker.symbol}' for alert in alerts]
-    if keys:
-        prices = await redis.mget(*keys)
-    else:
-        prices = []
+    if not rows:
+        return []
+
+    symbols = [row.TickerModel.symbol for row in rows]
+    prices = await redis.mget(*[f'price:{s}' for s in symbols])
 
     alerts_with_price = []
-    for alert, price in zip(alerts, prices):
-        ticker_price = TickerPrice(
-            id=alert.ticker.id,
-            symbol=alert.ticker.symbol,
-            name=alert.ticker.name,
-            price=float(price) if price is not None else 0
-        )
+    for (alert, ticker), price in zip(rows, prices):
         alerts_with_price.append(AlertWithTicker(
             id=alert.id,
             name=alert.name,
@@ -58,7 +53,12 @@ async def get_my_alerts_with_ticker_price(
             alert_status=alert.alert_status,
             created_at=alert.created_at,
             triggered_at=alert.triggered_at,
-            ticker=ticker_price
+            ticker=TickerPrice(
+                id=ticker.id,
+                symbol=ticker.symbol,
+                name=ticker.name,
+                price=float(price) if price else 0
+            )
         ))
 
     return alerts_with_price

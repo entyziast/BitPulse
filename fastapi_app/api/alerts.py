@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 from schemas.alerts import AlertCreate, AlertShow, AlertStatus
 from schemas.relations import AlertWithTicker
-from dependencies.users import get_current_user
+from schemas.users import TokenData
+from dependencies.users import get_current_user, get_check_token_data
 from database.database import get_session
 from database.redis import get_redis
 from database.models import UserModel, AlertModel
@@ -20,6 +21,7 @@ router = APIRouter(
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 UserMeDep = Annotated[UserModel, Depends(get_current_user)]
+AuthMeDep = Annotated[TokenData, Depends(get_check_token_data)]
 AlertDep = Annotated[AlertModel, Depends(get_alert_dep)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 
@@ -32,13 +34,13 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 )
 async def get_my_alerts(
     db: SessionDep,
-    user: UserMeDep,
+    user_data: AuthMeDep,
     redis: RedisDep,
     offset: Annotated[int | None, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
     status: Annotated[AlertStatus | None, Query(description='Filter alerts by status')] = None
 ):
-    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user, offset, limit, status)
+    alerts = await crud_alerts.get_my_alerts_with_ticker_price(db, redis, user_data.user_id, offset, limit, status)
     return alerts
 
 
