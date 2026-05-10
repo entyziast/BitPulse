@@ -3,7 +3,7 @@ import uuid
 
 
 class BitPulseUser(FastHttpUser):
-    wait_time = between(0.1, 1.0)
+    wait_time = between(0.1, 0.3)
     
     def on_start(self):
         self.username = f"test_{uuid.uuid4().hex[:8]}"
