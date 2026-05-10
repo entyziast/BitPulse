@@ -151,3 +151,21 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: bitpulse_postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
+    profiles: ["metrics"]
+    depends_on:
+      - postgres
+
+  redis-exporter:
+    image: oliver006/redis_exporter
+    container_name: bitpulse_redis_exporter
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    profiles: ["metrics"]
+    depends_on:
+      - redis
