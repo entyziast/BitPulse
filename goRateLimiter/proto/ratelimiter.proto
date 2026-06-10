@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package ratelimiter;
+option go_package = "internal/delivery/grpc";
+
+message RequestIP{
+	string ip = 1;
+}
+
+message ResponseAccess{
+	bool access = 1;
+}
+
+service RateLimiter {
+	rpc CheckAccess(RequestIP) returns (ResponseAccess);
+}
