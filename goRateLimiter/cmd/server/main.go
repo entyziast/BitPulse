@@ -7,7 +7,10 @@ import (
 	"goRateLimiter/internal/usecase"
 	"log"
 	"net"
+	"os"
+	"strconv"
 
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	googleGrpc "google.golang.org/grpc"
 )
@@ -26,9 +29,27 @@ func main() {
 		},
 	)
 
+	err1 := godotenv.Load(".env")
+	err2 := godotenv.Load("../.env") // для запуска через `go run cmd/server/main.go`
+	var TokensPerSecond, BucketCapacity float64
+	if err1 != nil && err2 != nil {
+		log.Println(domain.ErrNotFoundConfigData)
+		TokensPerSecond = 1
+		BucketCapacity = 10
+	} else {
+		var errParseTPS, errParseBC error
+		TokensPerSecond, errParseTPS = strconv.ParseFloat(os.Getenv("TOKENS_PER_SECOND"), 64)
+		BucketCapacity, errParseBC = strconv.ParseFloat(os.Getenv("BUCKET_CAPACITY"), 64)
+		if errParseBC != nil || errParseTPS != nil {
+			log.Println(domain.ErrNotFoundConfigData)
+			TokensPerSecond = 1
+			BucketCapacity = 10
+		}
+	}
+
 	config := domain.RateLimiterConfig{
-		TokensPerSecond: 1,
-		BucketCapacity:  10,
+		TokensPerSecond: TokensPerSecond,
+		BucketCapacity:  BucketCapacity,
 	}
 	repo := repository.NewRedisRepository(client, config)
 	useCase := usecase.NewLimiterUseCase(repo, config)
