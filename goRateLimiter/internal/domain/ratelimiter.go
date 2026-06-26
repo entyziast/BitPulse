@@ -7,6 +7,7 @@ import (
 )
 
 var ErrIPNotFound = errors.New("data about limiter status for this ip not found")
+var ErrNotFoundConfigData = errors.New("Not found TokensPerSecond and BucketCapacity in .env file, load default config")
 
 type RateLimiterConfig struct {
 	TokensPerSecond float64
