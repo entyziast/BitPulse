@@ -12,6 +12,7 @@ from exceptions.main_exception import BitPulseException
 import os
 import datetime
 from prometheus_fastapi_instrumentator import Instrumentator
+from grpc_client.client import RateLimiterClient
 
 
 load_dotenv()
@@ -27,16 +28,24 @@ instrumentator = Instrumentator(
 async def lifespan(app: FastAPI):
     redis_pool = from_url(os.getenv("REDIS_URL"), decode_responses=False)
     app.state.redis = redis_pool
+
+    limiter_address = "rate_limiter:50051"
+    limiter_client = RateLimiterClient(address=limiter_address)
+    app.state.limiter_client = limiter_client
     get_top50_tickers.delay()
+
     yield
+
     await redis_pool.close()
+    await limiter_client.close()
+
 
 app = FastAPI(title="BitPulse", lifespan=lifespan)
 instrumentator.instrument(app).expose(app)
 
 TOKENS_PER_SECOND=int(os.getenv('TOKENS_PER_SECOND'))
 BUCKET_CAPACITY=int(os.getenv('BUCKET_CAPACITY'))
-
+'''
 @app.middleware("http")
 async def rate_limit_middleware(request, call_next):
 
@@ -73,7 +82,22 @@ async def rate_limit_middleware(request, call_next):
 
     response = await call_next(request)
     return response 
+'''
 
+
+@app.middleware("http")
+async def rate_limit_middleware(request, call_next):
+    limiter_client: RateLimiterClient = app.state.limiter_client
+    client_ip = request.client.host
+
+    is_allowed = await limiter_client.check_access(ip=client_ip)
+    if not is_allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please try again later."}
+        )
+    response = await call_next(request)
+    return response 
 
 app.include_router(tickers.router)
 app.include_router(tg_integration.router)
