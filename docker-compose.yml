@@ -20,6 +20,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - rate_limiter
       #- elasticsearch
     command: /app/entrypoint.sh 
     
@@ -75,6 +76,14 @@ services:
     container_name: bitpulse_redis
     ports:
       - "6379:6379"
+
+  rate_limiter:
+    build: ./goRateLimiter
+    env_file: .env
+    ports:
+      - "50051:50051"
+    depends_on:
+      - redis
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
