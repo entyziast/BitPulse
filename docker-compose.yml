@@ -89,6 +89,8 @@ services:
   rate_limiter:
     build: ./goRateLimiter
     env_file: .env
+    ports:
+      - "50051:50051"
     depends_on:
       - redis
 

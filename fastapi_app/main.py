@@ -29,9 +29,9 @@ async def lifespan(app: FastAPI):
     redis_pool = from_url(os.getenv("REDIS_URL"), decode_responses=False)
     app.state.redis = redis_pool
 
-    #limiter_address = "rate_limiter:50051"
-    #limiter_client = RateLimiterClient(address=limiter_address)
-    #app.state.limiter_client = limiter_client
+    limiter_address = "rate_limiter:50051"
+    limiter_client = RateLimiterClient(address=limiter_address)
+    app.state.limiter_client = limiter_client
     get_top50_tickers.delay()
 
     yield
@@ -82,7 +82,7 @@ async def rate_limit_middleware(request, call_next):
 
     response = await call_next(request)
     return response 
-
+'''
 
 
 @app.middleware("http")
@@ -98,7 +98,6 @@ async def rate_limit_middleware(request, call_next):
         )
     response = await call_next(request)
     return response 
-'''
 
 app.include_router(tickers.router)
 app.include_router(tg_integration.router)
