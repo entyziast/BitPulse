@@ -2,27 +2,27 @@ package main
 
 import (
 	"context"
-	"goRateLimiter/internal/delivery/grpc"
+	httpDelivery "goRateLimiter/internal/delivery/http"
 	"goRateLimiter/internal/domain"
 	"goRateLimiter/internal/repository"
 	"goRateLimiter/internal/usecase"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
-	googleGrpc "google.golang.org/grpc"
 )
 
 func main() {
-	listener, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		log.Fatalf("Error open tcp port :50051 %s", err)
-	}
-
+	/*
+		listener, err := net.Listen("tcp", ":50051")
+		if err != nil {
+			log.Fatalf("Error open tcp port :50051 %s", err)
+		}
+	*/
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("../.env")
 
@@ -33,16 +33,17 @@ func main() {
 
 	client := redis.NewClient(
 		&redis.Options{
-			Addr:     redis_url,
-			DB:       0,
-			PoolSize: 300,
+			Addr:         redis_url,
+			DB:           0,
+			PoolSize:     300,
+			MinIdleConns: 20,
 		},
 	)
 
 	// test connection to Redis
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	err = client.Ping(ctx).Err()
+	err := client.Ping(ctx).Err()
 	if err != nil {
 		log.Fatalf("RateLimiter failed to connect to Redis at %s: %v", client.Options().Addr, err)
 	}
@@ -65,13 +66,28 @@ func main() {
 	}
 	repo := repository.NewRedisRepository(client, config)
 	useCase := usecase.NewLimiterUseCase(repo, config)
-	grpcHandler := grpc.NewGRPCServer(useCase)
+	/*
+		grpcHandler := grpc.NewGRPCServer(useCase)
+		grpcServer := googleGrpc.NewServer()
+		grpc.RegisterRateLimiterServer(grpcServer, grpcHandler)
+		log.Println("gRPC server started...")
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Fatal(err)
+		}
+	*/
+	httpHandler := httpDelivery.NewHTTPHandler(useCase)
 
-	grpcServer := googleGrpc.NewServer()
-	grpc.RegisterRateLimiterServer(grpcServer, grpcHandler)
-	log.Println("gRPC server started...")
-
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatal(err)
+	mux := http.NewServeMux()
+	mux.Handle("/rate_limiter", httpHandler.PanicRecoveryMiddleware(http.HandlerFunc(httpHandler.CheckAccess)))
+	server := &http.Server{
+		Addr:         ":50051",
+		Handler:      mux,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+	log.Println("HTTP RateLimiter server started on port :50051...")
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
 }
