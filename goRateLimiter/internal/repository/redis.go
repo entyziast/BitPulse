@@ -47,6 +47,9 @@ func (r RedisRepository) GetCurrentTokens(ctx context.Context, ip string) (domai
 		return domain.LimiterStatus{}, ErrCorruptedRedisKey
 	}
 	updatedAt, err := time.Parse(time.RFC3339, updatedAtString)
+	if err != nil {
+		return domain.LimiterStatus{}, ErrCorruptedRedisKey
+	}
 	return domain.LimiterStatus{
 		Tokens:    tokens,
 		UpdatedAt: updatedAt,
@@ -56,14 +59,17 @@ func (r RedisRepository) GetCurrentTokens(ctx context.Context, ip string) (domai
 
 func (r RedisRepository) UpdateCurrentTokens(ctx context.Context, ip string, status domain.LimiterStatus) error {
 	key := fmt.Sprintf("rate_limit:%s", ip)
-	err := r.redis.HSet(ctx, key, "tokens", status.Tokens, "timestamp", status.UpdatedAt.Format(time.RFC3339)).Err()
-	if err != nil {
-		return err
-	}
 	ttl := r.config.BucketCapacity / r.config.TokensPerSecond
-	err = r.redis.Expire(ctx, key, time.Duration(ttl)*time.Second).Err()
+
+	pipe := r.redis.Pipeline()
+
+	pipe.HSet(ctx, key, "tokens", status.Tokens, "timestamp", status.UpdatedAt.Format(time.RFC3339))
+	pipe.Expire(ctx, key, time.Duration(ttl)*time.Second)
+
+	_, err := pipe.Exec(ctx)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
