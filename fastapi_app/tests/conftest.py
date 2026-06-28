@@ -23,12 +23,19 @@ TestSessionMaker = sessionmaker(test_engine, class_=AsyncSession, expire_on_comm
 def anyio_backend():
     return "asyncio"
 
+class MockRateLimiterClient:
+    async def check_access(self, ip: str, timeout: float = 0.1) -> bool:
+        return True 
+    async def close(self):
+        pass 
+
 
 @pytest.fixture(autouse=True, scope='session')
 async def prepare_db():
     redis_url = os.getenv('TEST_REDIS_URL', 'redis://localhost:6379/0')
     app.state.redis = from_url(redis_url, decode_responses=False)
-
+    app.state.limiter_client = MockRateLimiterClient()
+    
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
